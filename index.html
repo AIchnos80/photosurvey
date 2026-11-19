@@ -103,9 +103,9 @@
 
 <div class="modal" id="mUser">
   <div class="card">
-    <h2>Chi scatta le foto?</h2>
-    <div class="muted">Il nome compare nell'oggetto della mail e, abbreviato, nel nome dei file archiviati (es. Sanna Raffaello → SaR).</div>
-    <input id="iName" placeholder="Cognome Nome" autocomplete="name" autocapitalize="words">
+    <h2>Chi usa l'app?</h2>
+    <div class="muted">Il nome compare nell'oggetto della mail e, abbreviato, nel nome dei file archiviati (es. Raffaello Sanna → RaS).</div>
+    <input id="iName" placeholder="Nome Cognome" autocomplete="name" autocapitalize="words">
     <div class="muted" id="iCode">&nbsp;</div>
     <div class="btns"><button class="btn p" id="bSaveUser">Salva</button></div>
   </div>
@@ -129,7 +129,7 @@ function toast(t, ms=2600){ const e=$('#toast'); e.textContent=t; e.classList.ad
 
 /* ---------- utente ---------- */
 function cleanName(n){ return (n||'').replace(/\s+/g,' ').trim(); }
-function userCode(n){ // prime 2 lettere del cognome + iniziale del nome
+function userCode(n){ // prime 2 lettere del nome + iniziale del cognome (Raffaello Sanna → RaS)
   const p = cleanName(n).split(' '); const c = p[0]||'', f = p[1]||'';
   return (c.charAt(0).toUpperCase() + c.charAt(1).toLowerCase() + f.charAt(0).toUpperCase()).replace(/[^\p{L}]/gu,'');
 }
@@ -137,9 +137,9 @@ function titleCase(n){ return cleanName(n).toLowerCase().replace(/(^|[\s'-])(\p{
 function user(){ return store.get('ps_user')||''; }
 function showUser(){ const u=user(); $('#who').textContent = u ? `${u} · ${userCode(u)}` : 'Imposta il tuo nome'; }
 function openUser(){ $('#iName').value=user(); updCode(); $('#mUser').classList.add('open'); setTimeout(()=>$('#iName').focus(),50); }
-function updCode(){ const v=$('#iName').value; $('#iCode').textContent = cleanName(v).split(' ').length>=2 ? `Codice autore: ${userCode(v)}` : 'Scrivi cognome e nome'; }
+function updCode(){ const v=$('#iName').value; $('#iCode').textContent = cleanName(v).split(' ').length>=2 ? `Codice autore: ${userCode(v)}` : 'Registra nome e cognome'; }
 $('#iName').addEventListener('input',updCode);
-$('#bSaveUser').onclick=()=>{ const v=titleCase($('#iName').value); if(v.split(' ').length<2){ toast('Inserisci cognome e nome'); return; } store.set('ps_user',v); $('#mUser').classList.remove('open'); showUser(); renderSheet(); };
+$('#bSaveUser').onclick=()=>{ const v=titleCase($('#iName').value); if(v.split(' ').length<2){ toast('Registra nome e cognome'); return; } store.set('ps_user',v); $('#mUser').classList.remove('open'); showUser(); renderSheet(); };
 $('#btnUser').onclick=openUser;
 
 /* ---------- mappa ---------- */
