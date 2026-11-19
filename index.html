@@ -54,6 +54,10 @@
   .thumbs button{position:absolute;top:3px;right:3px;border:0;border-radius:50%;width:24px;height:24px;background:rgba(0,0,0,.6);color:#fff;font-size:14px;line-height:1}
   .info{background:#F0F6FF;border-radius:12px;padding:10px 12px;margin-top:12px;font-size:13px;line-height:1.45}
   .info code{background:#fff;border-radius:6px;padding:1px 5px;font-size:12.5px;word-break:break-all}
+  .ct{font-size:15px;line-height:1.9}
+  .ct.muted{font-size:14px}
+  .lock{flex:none;width:100%;margin-top:6px;padding:10px}
+  a.tel{color:var(--navy);font-weight:700;text-decoration:none;border-bottom:2px solid var(--amber)}
   .modal{position:fixed;inset:0;z-index:2000;background:rgba(13,42,74,.6);display:none;align-items:center;justify-content:center;padding:20px}
   .modal.open{display:flex}
   .card{background:#fff;border-radius:18px;padding:22px;max-width:420px;width:100%}
@@ -111,6 +115,16 @@
   </div>
 </div>
 
+<div class="modal" id="mUnlock">
+  <div class="card">
+    <h2>🔒 Contatti dei PV</h2>
+    <div class="muted">Nome e telefono dei referenti dei PV sono protetti. Inserisci la password che ti è stata comunicata: verrà ricordata su questo telefono.</div>
+    <input id="iPw" type="password" placeholder="Password" autocomplete="current-password">
+    <div class="err" id="pwErr">&nbsp;</div>
+    <div class="btns"><button class="btn s" id="bPwLater">Più tardi</button><button class="btn p" id="bPwOk">Sblocca</button></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -139,7 +153,7 @@ function showUser(){ const u=user(); $('#who').textContent = u ? `${u} · ${user
 function openUser(){ $('#iName').value=user(); updCode(); $('#mUser').classList.add('open'); setTimeout(()=>$('#iName').focus(),50); }
 function updCode(){ const v=$('#iName').value; $('#iCode').textContent = cleanName(v).split(' ').length>=2 ? `Codice autore: ${userCode(v)}` : 'Registra nome e cognome'; }
 $('#iName').addEventListener('input',updCode);
-$('#bSaveUser').onclick=()=>{ const v=titleCase($('#iName').value); if(v.split(' ').length<2){ toast('Registra nome e cognome'); return; } store.set('ps_user',v); $('#mUser').classList.remove('open'); showUser(); renderSheet(); };
+$('#bSaveUser').onclick=()=>{ const v=titleCase($('#iName').value); if(v.split(' ').length<2){ toast('Registra nome e cognome'); return; } store.set('ps_user',v); $('#mUser').classList.remove('open'); showUser(); renderSheet(); if(!CONTACTS) openUnlock(); };
 $('#btnUser').onclick=openUser;
 
 /* ---------- mappa ---------- */
@@ -278,6 +292,45 @@ $('#bSend').onclick=async()=>{
   }catch(e){ toast('Errore nella preparazione: '+e.message,4000); renderSheet(); }
 };
 
+/* ---------- contatti cifrati (contacts.enc.json: AES-GCM, chiave PBKDF2 dalla password) ---------- */
+let ENC=null, CONTACTS=null;
+const b64d=t=>Uint8Array.from(atob(t),c=>c.charCodeAt(0));
+const b64e=u=>btoa(String.fromCharCode(...new Uint8Array(u)));
+async function decryptWith(key){ const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64d(ENC.iv)},key,b64d(ENC.ct)); return JSON.parse(new TextDecoder().decode(pt)); }
+async function unlockWithPassword(pw){
+  const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
+  const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:b64d(ENC.salt),iterations:ENC.iter,hash:'SHA-256'},base,{name:'AES-GCM',length:256},true,['decrypt']);
+  CONTACTS=await decryptWith(key);              // errore se la password è sbagliata
+  store.set('ps_ck',b64e(await crypto.subtle.exportKey('raw',key)));
+}
+async function unlockFromStore(){
+  const k=store.get('ps_ck'); if(!k||!ENC) return;
+  try{ const key=await crypto.subtle.importKey('raw',b64d(k),{name:'AES-GCM'},false,['decrypt']); CONTACTS=await decryptWith(key); }
+  catch(e){ CONTACTS=null; }
+}
+function openUnlock(){ if(!ENC||!window.crypto||!crypto.subtle) return; $('#iPw').value=''; $('#pwErr').innerHTML='&nbsp;'; $('#mUnlock').classList.add('open'); setTimeout(()=>$('#iPw').focus(),50); }
+$('#bPwLater').onclick=()=>$('#mUnlock').classList.remove('open');
+$('#bPwOk').onclick=async()=>{
+  const b=$('#bPwOk'); b.disabled=true; b.innerHTML='<span class="spin"></span>';
+  try{ await unlockWithPassword($('#iPw').value); $('#mUnlock').classList.remove('open'); toast('Contatti sbloccati'); renderSheet(); }
+  catch(e){ $('#pwErr').textContent='Password non corretta'; }
+  finally{ b.disabled=false; b.textContent='Sblocca'; }
+};
+$('#iPw').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#bPwOk').click(); });
+
+/* ---------- contatto del PV (SiteContact / Phone dalla lista SharePoint) ---------- */
+function esc(t){ return String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function telHref(n){ let d=n.replace(/[^\d+]/g,''); if(!d) return ''; if(!d.startsWith('+')) d='+39'+d; return 'tel:'+d; }
+function contactHtml(p){
+  if(!CONTACTS) return `<div class="ct muted">🔒 Contatti protetti</div><button class="btn s lock" onclick="openUnlock()">Sblocca con password</button>`;
+  const [who,tel]=CONTACTS[p.id]||['',''];
+  const w = who ? `<div class="ct">👤 ${esc(who)}</div>` : `<div class="ct muted">👤 Contatto non indicato</div>`;
+  const nums = (tel||'').split(/\s*[\/;,]\s*/).filter(x=>x.replace(/\D/g,'').length>=6);
+  const t = nums.length ? nums.map(n=>`<div class="ct">📞 <a class="tel" href="${telHref(n)}">${esc(n)}</a></div>`).join('')
+                        : `<div class="ct muted">📞 Telefono non indicato</div>`;
+  return w+t;
+}
+
 /* ---------- scheda PV ---------- */
 function renderSheet(){
   if(!sel) return;
@@ -291,10 +344,7 @@ function renderSheet(){
   const ok=photos.length>0 && sel.d && user();
   $('#bSend').disabled=!ok;
   $('#bSend').textContent = photos.length ? `Invia ${photos.length} foto all'archivio` : 'Invia foto';
-  const u=user();
-  $('#howto').innerHTML = u ? `Le foto vengono inviate direttamente all'archivio SharePoint del PV: non serve l'app di posta.<br>
-    <span class="muted">Saranno archiviate come <code>${sel.id}.aaMMgg.HHmmss.${userCode(u)}.jpg</code>. Senza rete restano in coda sul telefono e partono da sole.</span>`
-    : `<a href="#" onclick="openUser();return false">Imposta prima il tuo nome</a>`;
+  $('#howto').innerHTML = contactHtml(sel);
 }
 
 /* ---------- avvio ---------- */
@@ -304,6 +354,7 @@ fetch('pv.json',{cache:'no-cache'}).then(r=>r.json()).then(d=>{ PV=d; drawMarker
   .catch(()=>toast('Impossibile caricare l\'elenco dei PV'));
 showUser(); if(!user()) openUser();
 openDb().then(()=>{ updPending(); processQueue(); });
+fetch('contacts.enc.json',{cache:'no-cache'}).then(r=>r.json()).then(async e=>{ ENC=e; await unlockFromStore(); renderSheet(); if(user()&&!CONTACTS&&!store.get('ps_pw_asked')){ store.set('ps_pw_asked','1'); openUnlock(); } }).catch(()=>{});
 if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
 </body>

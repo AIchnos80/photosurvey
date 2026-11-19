@@ -1,6 +1,6 @@
 // Cache dell'app per l'uso anche con poca rete. I tile della mappa non vengono salvati.
-const CACHE = 'photosurvey-v2';
-const SHELL = ['./', 'index.html', 'pv.json', 'manifest.webmanifest', 'icon.svg', 'icon-192.png',
+const CACHE = 'photosurvey-v3';
+const SHELL = ['./', 'index.html', 'pv.json', 'contacts.enc.json', 'manifest.webmanifest', 'icon.svg', 'icon-192.png',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css', 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'];
 
 self.addEventListener('install', e => {
