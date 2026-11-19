@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PhotoSurvey PV Sardegna</title>
+<meta name="theme-color" content="#0D2A4A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PhotoSurvey">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root{--navy:#0D2A4A;--amber:#F2A900;--q8:#01579B;--eni:#E0A100;--bg:#F4F6F9;--txt:#1B2430;--muted:#667085;--ok:#2E7D32;--err:#C62828;
+        --st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px)}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;font-family:-apple-system,system-ui,"Segoe UI",Roboto,sans-serif;color:var(--txt);background:var(--bg)}
+  button{font:inherit;cursor:pointer}
+  header{position:fixed;top:0;left:0;right:0;z-index:1000;background:var(--navy);color:#fff;padding:calc(var(--st) + 10px) 14px 10px;display:flex;align-items:center;gap:10px}
+  header h1{font-size:17px;margin:0;flex:1;line-height:1.2}
+  header h1 small{display:block;font-weight:400;font-size:12px;opacity:.8}
+  .pill{background:rgba(255,255,255,.14);border:0;color:#fff;border-radius:999px;padding:6px 12px;font-size:13px}
+  #map{position:fixed;left:0;right:0;bottom:0;top:calc(var(--st) + 58px)}
+  .search{position:fixed;z-index:999;left:12px;right:12px;top:calc(var(--st) + 68px)}
+  .search input{width:100%;padding:12px 16px;border-radius:24px;border:1px solid #d0d5dd;font-size:16px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+  .results{background:#fff;border-radius:14px;margin-top:6px;box-shadow:0 4px 16px rgba(0,0,0,.15);overflow:hidden}
+  .results button{display:block;width:100%;text-align:left;border:0;background:#fff;padding:12px 16px;border-bottom:1px solid #eef0f3;font-size:14px}
+  .chips{display:flex;gap:6px;margin-top:8px}
+  .chip{border:1px solid #d0d5dd;background:#fff;border-radius:999px;padding:5px 12px;font-size:13px;box-shadow:0 1px 4px rgba(0,0,0,.1)}
+  .chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+  .fab{position:fixed;z-index:999;right:14px;bottom:calc(var(--sb) + 22px);width:56px;height:56px;border-radius:50%;border:0;background:var(--amber);color:var(--navy);box-shadow:0 4px 12px rgba(0,0,0,.25);font-size:24px}
+  .pin{border-radius:999px;color:#fff;font:700 11px/1 system-ui,sans-serif;padding:5px 7px;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);white-space:nowrap;transform:translate(-50%,-50%);position:absolute}
+  .pin.q8{background:var(--q8)} .pin.eni{background:var(--eni);color:#1b1b1b} .pin.sel{background:var(--amber);color:var(--navy);transform:translate(-50%,-50%) scale(1.25)}
+  .far .pin:not(.sel){font-size:0;padding:5px;border-width:1.5px}
+  .me{width:16px;height:16px;border-radius:50%;background:#1E88E5;border:3px solid #fff;box-shadow:0 0 0 6px rgba(30,136,229,.25)}
+  .sheet{position:fixed;z-index:1001;left:0;right:0;bottom:0;background:#fff;border-radius:20px 20px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.2);padding:16px 16px calc(var(--sb) + 16px);max-height:78vh;overflow:auto;transform:translateY(105%);transition:transform .25s}
+  .sheet.open{transform:none}
+  .row{display:flex;align-items:center;gap:8px}
+  .badge{background:var(--navy);color:#fff;border-radius:8px;padding:3px 9px;font-weight:700}
+  .badge.eni{background:var(--eni);color:#1b1b1b}
+  .x{margin-left:auto;border:0;background:#eef0f3;border-radius:50%;width:34px;height:34px;font-size:18px}
+  .addr{font-weight:600;margin:10px 0 4px}
+  .muted{color:var(--muted);font-size:13px}
+  .err{color:var(--err);font-size:13px}
+  .btns{display:flex;gap:8px;margin-top:14px}
+  .btn{flex:1;border:0;border-radius:12px;padding:14px;font-weight:600;font-size:15px}
+  .btn.p{background:var(--navy);color:#fff} .btn.s{background:#eef0f3;color:var(--navy)} .btn.a{background:var(--amber);color:var(--navy)}
+  .btn:disabled{opacity:.45}
+  .thumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:12px}
+  .thumbs div{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:#eef0f3}
+  .thumbs img{width:100%;height:100%;object-fit:cover}
+  .thumbs button{position:absolute;top:3px;right:3px;border:0;border-radius:50%;width:24px;height:24px;background:rgba(0,0,0,.6);color:#fff;font-size:14px;line-height:1}
+  .info{background:#F0F6FF;border-radius:12px;padding:10px 12px;margin-top:12px;font-size:13px;line-height:1.45}
+  .info code{background:#fff;border-radius:6px;padding:1px 5px;font-size:12.5px;word-break:break-all}
+  .modal{position:fixed;inset:0;z-index:2000;background:rgba(13,42,74,.6);display:none;align-items:center;justify-content:center;padding:20px}
+  .modal.open{display:flex}
+  .card{background:#fff;border-radius:18px;padding:22px;max-width:420px;width:100%}
+  .card h2{margin:0 0 6px;font-size:20px}
+  .card input{width:100%;padding:13px 14px;border:1px solid #d0d5dd;border-radius:12px;font-size:16px;margin:10px 0 4px}
+  .toast{position:fixed;z-index:3000;left:50%;bottom:calc(var(--sb) + 90px);transform:translateX(-50%);background:#1B2430;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
+  .toast.on{opacity:1}
+  .spin{display:inline-block;width:16px;height:16px;border:2px solid #fff;border-right-color:transparent;border-radius:50%;animation:s 1s linear infinite;vertical-align:-3px}
+  @keyframes s{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<header>
+  <h1>PhotoSurvey PV Sardegna<small id="who">—</small></h1>
+  <button class="pill" id="btnQ" hidden></button>
+  <button class="pill" id="btnUser">Utente</button>
+</header>
+
+<div id="map"></div>
+
+<div class="search">
+  <input id="q" type="search" placeholder="Cerca SiteId o comune" autocomplete="off" enterkeyhint="search">
+  <div class="results" id="res"></div>
+  <div class="chips">
+    <button class="chip on" data-c="Q8">Q8</button>
+    <button class="chip on" data-c="ENILIVE">ENILIVE</button>
+  </div>
+</div>
+
+<button class="fab" id="near" title="PV più vicino" aria-label="PV più vicino">◎</button>
+
+<section class="sheet" id="sheet" aria-live="polite">
+  <div class="row"><span class="badge" id="sId"></span><span class="muted" id="sCo"></span><button class="x" id="sClose" aria-label="Chiudi">×</button></div>
+  <div class="addr" id="sAddr"></div>
+  <div class="muted" id="sDist"></div>
+  <div class="err" id="sNoDir" hidden>Questo PV non ha una cartella di archivio nell'elenco SharePoint: le foto verrebbero rifiutate.</div>
+  <div class="btns">
+    <button class="btn p" id="bCam">📷 Scatta foto</button>
+    <button class="btn s" id="bGal">🖼️ Galleria</button>
+  </div>
+  <input type="file" id="fCam" accept="image/*" capture="environment" hidden>
+  <input type="file" id="fGal" accept="image/*" multiple hidden>
+  <div class="thumbs" id="thumbs"></div>
+  <div class="btns"><button class="btn a" id="bSend" disabled>Invia foto</button></div>
+  <div class="info" id="howto"></div>
+</section>
+
+<div class="modal" id="mUser">
+  <div class="card">
+    <h2>Chi scatta le foto?</h2>
+    <div class="muted">Il nome compare nell'oggetto della mail e, abbreviato, nel nome dei file archiviati (es. Sanna Raffaello → SaR).</div>
+    <input id="iName" placeholder="Cognome Nome" autocomplete="name" autocapitalize="words">
+    <div class="muted" id="iCode">&nbsp;</div>
+    <div class="btns"><button class="btn p" id="bSaveUser">Salva</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const MAILBOX = 'r.sanna@argelato.onmicrosoft.com';
+const PREFIX = 'PHOTOSURVEY';
+const RELAY_URL = 'https://script.google.com/macros/s/AKfycby9u-ObyxCjEwAUIHVE3zeQuEoOF7Wyaio2T46SnL2dkZjW0CHiyb7U8iyzDGMMd6v-/exec';      // app web Google Apps Script (/exec)
+const RELAY_TOKEN = 'ps_RHZvge1WZnZLKjpD6ZXSb59S';
+const MAX_SIDE = 2560, QUALITY = 0.85, BATCH_BYTES = 12*1024*1024, BATCH_FILES = 20;
+
+const $ = s => document.querySelector(s);
+const store = { get(k){ try{ return localStorage.getItem(k) }catch(e){ return null } }, set(k,v){ try{ localStorage.setItem(k,v) }catch(e){} } };
+let PV = [], markers = {}, sel = null, me = null, meMarker = null, photos = [], filt = new Set(['Q8','ENILIVE']);
+
+function toast(t, ms=2600){ const e=$('#toast'); e.textContent=t; e.classList.add('on'); clearTimeout(e._t); e._t=setTimeout(()=>e.classList.remove('on'),ms); }
+
+/* ---------- utente ---------- */
+function cleanName(n){ return (n||'').replace(/\s+/g,' ').trim(); }
+function userCode(n){ // prime 2 lettere del cognome + iniziale del nome
+  const p = cleanName(n).split(' '); const c = p[0]||'', f = p[1]||'';
+  return (c.charAt(0).toUpperCase() + c.charAt(1).toLowerCase() + f.charAt(0).toUpperCase()).replace(/[^\p{L}]/gu,'');
+}
+function titleCase(n){ return cleanName(n).toLowerCase().replace(/(^|[\s'-])(\p{L})/gu,(m,a,b)=>a+b.toUpperCase()); }
+function user(){ return store.get('ps_user')||''; }
+function showUser(){ const u=user(); $('#who').textContent = u ? `${u} · ${userCode(u)}` : 'Imposta il tuo nome'; }
+function openUser(){ $('#iName').value=user(); updCode(); $('#mUser').classList.add('open'); setTimeout(()=>$('#iName').focus(),50); }
+function updCode(){ const v=$('#iName').value; $('#iCode').textContent = cleanName(v).split(' ').length>=2 ? `Codice autore: ${userCode(v)}` : 'Scrivi cognome e nome'; }
+$('#iName').addEventListener('input',updCode);
+$('#bSaveUser').onclick=()=>{ const v=titleCase($('#iName').value); if(v.split(' ').length<2){ toast('Inserisci cognome e nome'); return; } store.set('ps_user',v); $('#mUser').classList.remove('open'); showUser(); renderSheet(); };
+$('#btnUser').onclick=openUser;
+
+/* ---------- mappa ---------- */
+const map = L.map('map',{zoomControl:false,attributionControl:true}).setView([39.75,9.0],8);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+
+function pinIcon(p, on){ return L.divIcon({className:'',html:`<div class="pin ${p.c==='Q8'?'q8':'eni'} ${on?'sel':''}">${p.id}</div>`,iconSize:[0,0]}); }
+function drawMarkers(){
+  for(const p of PV){
+    const vis = filt.has(p.c);
+    if(!markers[p.id]){ markers[p.id]=L.marker([p.lat,p.lon],{icon:pinIcon(p,false)}).on('click',()=>select(p)); }
+    const m=markers[p.id];
+    if(vis && !map.hasLayer(m)) m.addTo(map); if(!vis && map.hasLayer(m)) map.removeLayer(m);
+  }
+}
+document.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{ const k=c.dataset.c; filt.has(k)?filt.delete(k):filt.add(k); c.classList.toggle('on'); drawMarkers(); });
+
+function dist(a,b,c,d){ const R=6371,r=Math.PI/180,x=(c-a)*r,y=(d-b)*r; const h=Math.sin(x/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin(y/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
+
+function select(p, fly=true){
+  if(sel && markers[sel.id]) markers[sel.id].setIcon(pinIcon(sel,false));
+  if(sel?.id!==p?.id) photos=[];
+  sel=p;
+  if(!p){ $('#sheet').classList.remove('open'); return; }
+  markers[p.id].setIcon(pinIcon(p,true)); markers[p.id].setZIndexOffset(1000);
+  renderSheet(); $('#sheet').classList.add('open');
+  if(fly){ // centra il PV nella parte di mappa libera sopra la scheda
+    const z=Math.max(map.getZoom(),14), off=$('#sheet').offsetHeight/2;
+    map.flyTo(map.unproject(map.project([p.lat,p.lon],z).add([0,off]),z), z, {duration:.6});
+  }
+}
+$('#sClose').onclick=()=>select(null);
+
+/* ---------- ricerca ---------- */
+$('#q').addEventListener('input',()=>{
+  const q=$('#q').value.trim().toUpperCase(); const r=$('#res'); r.innerHTML='';
+  if(q.length<2) return;
+  PV.filter(p=>p.id.startsWith(q)||p.a.toUpperCase().includes(q)).slice(0,7).forEach(p=>{
+    const b=document.createElement('button'); b.textContent=p.a; b.onclick=()=>{ $('#q').value=''; r.innerHTML=''; $('#q').blur(); select(p); }; r.appendChild(b);
+  });
+  if(!r.children.length){ const d=document.createElement('button'); d.textContent='Nessun PV trovato'; d.disabled=true; r.appendChild(d); }
+});
+
+/* ---------- posizione ---------- */
+function locate(cb){
+  if(!navigator.geolocation){ toast('Posizione non disponibile su questo dispositivo'); return; }
+  toast('Cerco la tua posizione…');
+  navigator.geolocation.getCurrentPosition(pos=>{
+    me=[pos.coords.latitude,pos.coords.longitude];
+    if(!meMarker) meMarker=L.marker(me,{icon:L.divIcon({className:'',html:'<div class="me"></div>',iconSize:[16,16]}),interactive:false}).addTo(map); else meMarker.setLatLng(me);
+    cb&&cb();
+  },e=>toast(e.code===1?'Permesso posizione negato: abilitalo nelle impostazioni del browser':'Posizione non disponibile'),{enableHighAccuracy:true,timeout:15000,maximumAge:60000});
+}
+$('#near').onclick=()=>locate(()=>{
+  const c=PV.filter(p=>filt.has(p.c)); if(!c.length) return;
+  let best=c[0],bd=1e9; for(const p of c){ const d=dist(me[0],me[1],p.lat,p.lon); if(d<bd){bd=d;best=p;} }
+  select(best);
+});
+
+/* ---------- foto ---------- */
+$('#bCam').onclick=()=>{ if(!user()){ openUser(); return; } $('#fCam').click(); };
+$('#bGal').onclick=()=>{ if(!user()){ openUser(); return; } $('#fGal').click(); };
+$('#fCam').onchange=e=>addFiles(e.target.files,e.target);
+$('#fGal').onchange=e=>addFiles(e.target.files,e.target);
+
+async function shrink(file){
+  try{
+    let src, w, h;
+    if(window.createImageBitmap){ src=await createImageBitmap(file,{imageOrientation:'from-image'}); w=src.width; h=src.height; }
+    else{ src=await new Promise((ok,ko)=>{ const i=new Image(); i.onload=()=>ok(i); i.onerror=ko; i.src=URL.createObjectURL(file); }); w=src.naturalWidth; h=src.naturalHeight; }
+    const k=Math.min(1, MAX_SIDE/Math.max(w,h));
+    if(k===1 && file.size<2.5e6 && /jpe?g/i.test(file.type)) return file;
+    const cv=document.createElement('canvas'); cv.width=Math.round(w*k); cv.height=Math.round(h*k);
+    cv.getContext('2d').drawImage(src,0,0,cv.width,cv.height);
+    const blob=await new Promise(r=>cv.toBlob(r,'image/jpeg',QUALITY));
+    return blob||file;
+  }catch(e){ return file; }
+}
+async function addFiles(list,input){
+  const files=[...list].filter(f=>f.type.startsWith('image/')||/\.(jpe?g|png|heic|heif|webp)$/i.test(f.name));
+  input.value='';
+  if(!files.length) return;
+  $('#bSend').disabled=true; $('#bSend').innerHTML='<span class="spin"></span> Preparo le foto…';
+  for(const f of files){ const b=await shrink(f); photos.push({blob:b,url:URL.createObjectURL(b)}); }
+  renderSheet();
+}
+function fileName(i){ return `${PREFIX}_${sel.id}_${userCode(user())}_${String(i+1).padStart(2,'0')}.jpg`; }
+function subject(){ return `${PREFIX} ${sel.id} ${user()}`; }
+
+/* ---------- coda di invio (IndexedDB: sopravvive a chiusura app e assenza di rete) ---------- */
+const memQ=[]; let db=null;
+function openDb(){ return new Promise(ok=>{ try{ const r=indexedDB.open('photosurvey',1);
+  r.onupgradeneeded=()=>r.result.createObjectStore('q',{keyPath:'k',autoIncrement:true});
+  r.onsuccess=()=>{ db=r.result; ok(); }; r.onerror=()=>ok(); }catch(e){ ok(); } }); }
+function qTx(mode,fn){ return new Promise((ok,ko)=>{ const t=db.transaction('q',mode); const s=t.objectStore('q'); const r=fn(s); t.oncomplete=()=>ok(r&&r.result); t.onerror=()=>ko(t.error); }); }
+async function qAdd(item){ if(db) return qTx('readwrite',s=>s.add(item)); item.k=Date.now()+Math.random(); memQ.push(item); }
+async function qAll(){ if(db) return qTx('readonly',s=>s.getAll()); return memQ.slice(); }
+async function qDel(k){ if(db) return qTx('readwrite',s=>s.delete(k)); const i=memQ.findIndex(x=>x.k===k); if(i>=0) memQ.splice(i,1); }
+function b64(blob){ return new Promise((ok,ko)=>{ const r=new FileReader(); r.onload=()=>ok(String(r.result).split(',')[1]); r.onerror=ko; r.readAsDataURL(blob); }); }
+
+let sending=false;
+async function processQueue(){
+  if(sending) return; sending=true;
+  try{
+    for(const it of await qAll()){
+      if(!navigator.onLine) break;
+      const res=await fetch(RELAY_URL,{method:'POST',body:JSON.stringify({token:RELAY_TOKEN,siteId:it.siteId,name:it.name,photos:it.photos})});
+      const j=await res.json().catch(()=>({ok:false,error:'risposta non valida'}));
+      if(j.ok){ await qDel(it.k); toast(`✓ ${it.photos.length} foto del PV ${it.siteId} inviate all'archivio`,3500); }
+      else if(/non valid|non autorizzato/i.test(j.error||'')){ await qDel(it.k); toast('Invio rifiutato: '+j.error,5000); }
+      else throw new Error(j.error||'errore');
+    }
+  }catch(e){ toast('Invio in sospeso: riprovo appena c\'è rete',3500); }
+  finally{ sending=false; updPending(); }
+}
+async function updPending(){ const n=(await qAll()).reduce((s,x)=>s+x.photos.length,0); const b=$('#btnQ'); b.hidden=!n; b.textContent=`⏳ ${n} in coda`; }
+$('#btnQ').onclick=()=>{ toast('Riprovo l\'invio…'); processQueue(); };
+window.addEventListener('online',processQueue);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) processQueue(); });
+
+$('#bSend').onclick=async()=>{
+  if(!sel||!photos.length||!user()) return;
+  const btn=$('#bSend'); btn.disabled=true; btn.innerHTML='<span class="spin"></span> Preparo l\'invio…';
+  try{
+    // blocchi da max 12 MB / 20 foto (una mail ciascuno)
+    let batch=[], size=0, n=0;
+    const flush=async()=>{ if(batch.length){ await qAdd({siteId:sel.id,name:user(),photos:batch,ts:Date.now()}); batch=[]; size=0; } };
+    for(const p of photos){
+      if(batch.length && (size+p.blob.size>BATCH_BYTES || batch.length>=BATCH_FILES)) await flush();
+      batch.push({name:fileName(n++),b64:await b64(p.blob)}); size+=p.blob.size;
+    }
+    await flush();
+    photos.forEach(p=>URL.revokeObjectURL(p.url)); photos=[]; renderSheet();
+    toast(navigator.onLine?'Invio in corso…':'Nessuna rete: le foto partiranno appena possibile',3000);
+    updPending(); processQueue();
+  }catch(e){ toast('Errore nella preparazione: '+e.message,4000); renderSheet(); }
+};
+
+/* ---------- scheda PV ---------- */
+function renderSheet(){
+  if(!sel) return;
+  $('#sId').textContent=sel.id; $('#sId').className='badge'+(sel.c==='Q8'?'':' eni');
+  $('#sCo').textContent=sel.c; $('#sAddr').textContent=sel.a.replace(/^\d+\s/,'');
+  $('#sDist').textContent = me ? `a ${dist(me[0],me[1],sel.lat,sel.lon).toFixed(1)} km da te` : '';
+  $('#sNoDir').hidden=!!sel.d; $('#bCam').disabled=$('#bGal').disabled=!sel.d;
+  const t=$('#thumbs'); t.innerHTML='';
+  photos.forEach((p,i)=>{ const d=document.createElement('div'); d.innerHTML=`<img src="${p.url}" alt=""><button aria-label="Rimuovi">×</button>`;
+    d.querySelector('button').onclick=()=>{ URL.revokeObjectURL(p.url); photos.splice(i,1); renderSheet(); }; t.appendChild(d); });
+  const ok=photos.length>0 && sel.d && user();
+  $('#bSend').disabled=!ok;
+  $('#bSend').textContent = photos.length ? `Invia ${photos.length} foto all'archivio` : 'Invia foto';
+  const u=user();
+  $('#howto').innerHTML = u ? `Le foto vengono inviate direttamente all'archivio SharePoint del PV: non serve l'app di posta.<br>
+    <span class="muted">Saranno archiviate come <code>${sel.id}.aaMMgg.HHmmss.${userCode(u)}.jpg</code>. Senza rete restano in coda sul telefono e partono da sole.</span>`
+    : `<a href="#" onclick="openUser();return false">Imposta prima il tuo nome</a>`;
+}
+
+/* ---------- avvio ---------- */
+const farZoom=()=>$('#map').classList.toggle('far', map.getZoom()<11);
+map.on('zoomend',farZoom); farZoom();
+fetch('pv.json',{cache:'no-cache'}).then(r=>r.json()).then(d=>{ PV=d; drawMarkers(); map.fitBounds(L.latLngBounds(d.map(p=>[p.lat,p.lon])),{padding:[20,20]}); })
+  .catch(()=>toast('Impossibile caricare l\'elenco dei PV'));
+showUser(); if(!user()) openUser();
+openDb().then(()=>{ updPending(); processQueue(); });
+if('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
