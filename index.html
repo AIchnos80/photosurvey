@@ -48,6 +48,7 @@
   .btn{flex:1;border:0;border-radius:12px;padding:14px;font-weight:600;font-size:15px}
   .btn.p{background:var(--navy);color:#fff} .btn.s{background:#eef0f3;color:var(--navy)} .btn.a{background:var(--amber);color:var(--navy)}
   .btn:disabled{opacity:.45}
+  .tip{flex:0 0 52px;display:flex} .btn.mini{flex:1;padding:14px 0;font-size:18px} .btn.mini:disabled{pointer-events:none}
   .thumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:12px}
   .thumbs div{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:#eef0f3}
   .thumbs img{width:100%;height:100%;object-fit:cover}
@@ -97,6 +98,7 @@
   <div class="btns">
     <button class="btn p" id="bCam">📷 Scatta foto</button>
     <button class="btn s" id="bGal">🖼️ Galleria</button>
+    <span class="tip" id="tMario" title="Modalità Super Mario Bros"><button class="btn s mini" id="bMario" disabled aria-label="Modalità Super Mario Bros">🔧</button></span>
   </div>
   <input type="file" id="fCam" accept="image/*" capture="environment" hidden>
   <input type="file" id="fGal" accept="image/*" multiple hidden>
@@ -216,6 +218,7 @@ $('#near').onclick=()=>locate(()=>{
 /* ---------- foto ---------- */
 $('#bCam').onclick=()=>{ if(!user()){ openUser(); return; } $('#fCam').click(); };
 $('#bGal').onclick=()=>{ if(!user()){ openUser(); return; } $('#fGal').click(); };
+$('#tMario').onclick=()=>{ if($('#bMario').disabled) toast('🔧 Modalità Super Mario Bros: in arrivo',2500); };
 $('#fCam').onchange=e=>addFiles(e.target.files,e.target);
 $('#fGal').onchange=e=>addFiles(e.target.files,e.target);
 
