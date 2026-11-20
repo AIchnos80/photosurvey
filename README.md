@@ -3,7 +3,7 @@
 È una web app per Android e iPhone che serve a fotografare i punti vendita e a inviare le foto alla casella di archiviazione. Da lì il flusso Power Automate "PHOTOSURVEY - Archiviazione foto PV Sardegna" le salva in SharePoint.
 
 ## Come si usa
-1. Al primo avvio si inserisce **Nome Cognome**, per esempio *Raffaello Sanna*. Il codice autore viene calcolato da solo: **RaS** (prime 2 lettere del nome + iniziale del cognome).
+1. Al primo avvio si inserisce **Nome Cognome**, per esempio *Raffaello Sanna*. Il codice autore viene calcolato da solo: **RS** (iniziale del nome + iniziale del cognome).
 2. Si sceglie il PV in uno di tre modi: dalla mappa, cercando il SiteId o il comune, oppure con il pulsante ◎, che trova il PV più vicino in base al GPS.
 3. Con **Scatta foto** o **Galleria** si aggiungono le foto. L'app le riduce a 2560 px, circa 1 MB ciascuna, così una mail ne contiene molte.
 4. **Invia foto all'archivio**: non c'è nient'altro da fare. L'app manda le foto al servizio di inoltro (Google Apps Script "PhotoSurvey - inoltro foto", account rsanna.argelato@gmail.com). Il servizio scrive la mail a `r.sanna@argelato.onmicrosoft.com` con oggetto `PHOTOSURVEY <SiteId> <Nome Cognome>`, e il flusso Power Automate archivia le foto in SharePoint.
