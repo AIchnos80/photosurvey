@@ -48,6 +48,19 @@
   .btn{flex:1;border:0;border-radius:12px;padding:14px;font-weight:600;font-size:15px}
   .btn.p{background:var(--navy);color:#fff} .btn.s{background:#eef0f3;color:var(--navy)} .btn.a{background:var(--amber);color:var(--navy)}
   .btn:disabled{opacity:.45}
+  .page{position:fixed;inset:0;z-index:1500;background:#f5f6f8;display:none;flex-direction:column}
+  .page.open{display:flex}
+  .page header{position:relative;z-index:auto;display:flex;align-items:center;gap:10px;padding:14px 14px 12px;background:var(--navy);color:#fff;padding-top:max(14px,env(safe-area-inset-top))}
+  .page header h2{margin:0;font-size:17px;flex:1}
+  .page header .back{background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:10px;width:40px;height:40px;font-size:20px}
+  .page .pvh{padding:12px 16px;background:#fff;border-bottom:1px solid #e4e7ec}
+  .page .list{flex:1;overflow:auto;padding:12px 16px 24px}
+  .rq{background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);border-left:4px solid var(--amber)}
+  .rq .h{display:flex;justify-content:space-between;gap:8px;font-weight:700;color:var(--navy)}
+  .rq .o{margin:6px 0 4px;line-height:1.35}
+  .rq .m{font-size:13px;color:#667}
+  .empty{text-align:center;color:#667;padding:48px 16px;line-height:1.5}
+  .empty b{display:block;font-size:40px;margin-bottom:8px}
   .tip{flex:0 0 52px;display:flex} .btn.mini{flex:1;padding:14px 0;font-size:18px} .btn.mini:disabled{pointer-events:none}
   .thumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:12px}
   .thumbs div{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:#eef0f3}
@@ -107,6 +120,11 @@
   <div class="info" id="howto"></div>
 </section>
 
+<section class="page" id="pReq" aria-label="Richieste non evase">
+  <header><button class="back" id="bReqBack" aria-label="Indietro">←</button><h2>🔧 Richieste non evase</h2></header>
+  <div class="pvh"><div class="row"><span class="badge" id="rId"></span><span class="muted" id="rCo"></span></div><div id="rAddr" style="margin-top:6px;font-weight:600"></div><div class="muted" id="rUpd" style="margin-top:4px;font-size:13px"></div></div>
+  <div class="list" id="rList"></div>
+</section>
 <div class="modal" id="mUser">
   <div class="card">
     <h2>Chi usa l'app?</h2>
@@ -218,7 +236,7 @@ $('#near').onclick=()=>locate(()=>{
 /* ---------- foto ---------- */
 $('#bCam').onclick=()=>{ if(!user()){ openUser(); return; } $('#fCam').click(); };
 $('#bGal').onclick=()=>{ if(!user()){ openUser(); return; } $('#fGal').click(); };
-$('#tMario').onclick=()=>{ if($('#bMario').disabled) toast('🔧 Modalità Super Mario Bros: in arrivo',2500); };
+$('#tMario').onclick=()=>{ if(!CONTACTS){ toast('🔒 Modalità Super Mario Bros: serve la password',2500); openUnlock(); return; } openReq(); };
 $('#fCam').onchange=e=>addFiles(e.target.files,e.target);
 $('#fGal').onchange=e=>addFiles(e.target.files,e.target);
 
@@ -328,7 +346,7 @@ $('#bSend').onclick=async()=>{
 };
 
 /* ---------- contatti cifrati (contacts.enc.json: AES-GCM, chiave PBKDF2 dalla password) ---------- */
-let ENC=null, CONTACTS=null;
+let ENC=null, CONTACTS=null, CKEY=null, REQ=null;
 const b64d=t=>Uint8Array.from(atob(t),c=>c.charCodeAt(0));
 const b64e=u=>btoa(String.fromCharCode(...new Uint8Array(u)));
 async function decryptWith(key){ const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64d(ENC.iv)},key,b64d(ENC.ct)); return JSON.parse(new TextDecoder().decode(pt)); }
@@ -336,11 +354,12 @@ async function unlockWithPassword(pw){
   const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
   const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:b64d(ENC.salt),iterations:ENC.iter,hash:'SHA-256'},base,{name:'AES-GCM',length:256},true,['decrypt']);
   CONTACTS=await decryptWith(key);              // errore se la password è sbagliata
+  CKEY=key; loadReq();
   store.set('ps_ck',b64e(await crypto.subtle.exportKey('raw',key)));
 }
 async function unlockFromStore(){
   const k=store.get('ps_ck'); if(!k||!ENC) return;
-  try{ const key=await crypto.subtle.importKey('raw',b64d(k),{name:'AES-GCM'},false,['decrypt']); CONTACTS=await decryptWith(key); }
+  try{ const key=await crypto.subtle.importKey('raw',b64d(k),{name:'AES-GCM'},false,['decrypt']); CONTACTS=await decryptWith(key); CKEY=key; loadReq(); }
   catch(e){ CONTACTS=null; }
 }
 function openUnlock(){ if(!ENC||!window.crypto||!crypto.subtle) return; $('#iPw').value=''; $('#pwErr').innerHTML='&nbsp;'; $('#mUnlock').classList.add('open'); setTimeout(()=>$('#iPw').focus(),50); }
@@ -352,6 +371,33 @@ $('#bPwOk').onclick=async()=>{
   finally{ b.disabled=false; b.textContent='Sblocca'; }
 };
 $('#iPw').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#bPwOk').click(); });
+
+/* ---------- Modalità Super Mario Bros: richieste non evase (requests.enc.json, cifrato con la stessa chiave) ---------- */
+async function loadReq(){
+  try{
+    const e=await fetch('requests.enc.json',{cache:'no-cache'}).then(r=>{ if(!r.ok) throw 0; return r.json(); });
+    const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64d(e.iv)},CKEY,b64d(e.ct));
+    REQ=JSON.parse(new TextDecoder().decode(pt));
+  }catch(err){ REQ=REQ||{pv:{}}; }
+  if($('#pReq').classList.contains('open')) renderReq();
+}
+const fmtD=d=>{ const m=String(d||'').match(/^(\d{4})-(\d\d)-(\d\d)/); return m?`${m[3]}/${m[2]}/${m[1]}`:(d||''); };
+function renderReq(){
+  if(!sel) return;
+  $('#rId').textContent=sel.id; $('#rId').className='badge'+(sel.c==='Q8'?'':' eni');
+  $('#rCo').textContent=sel.c; $('#rAddr').textContent=sel.a.replace(/^\d+\s/,'');
+  $('#rUpd').textContent = REQ&&REQ.aggiornato ? `Elenco aggiornato al ${fmtD(REQ.aggiornato)}` : '';
+  const list=(REQ&&REQ.pv&&REQ.pv[sel.id])||[];
+  $('#rList').innerHTML = !REQ ? '<div class="empty"><span class="spin"></span></div>'
+    : list.length ? list.map(r=>`<div class="rq"><div class="h"><span>${esc(r.n||'Richiesta')}</span><span>${esc(fmtD(r.data))}</span></div>`
+        +`<div class="o">${esc(r.ogg||'')}</div>`
+        +(r.stato||r.note?`<div class="m">${esc([r.stato,r.note].filter(Boolean).join(' · '))}</div>`:'')+`</div>`).join('')
+    : '<div class="empty"><b>🍄</b>Nessuna richiesta non evasa<br>per questo punto vendita.</div>';
+}
+function openReq(){ if(!sel) return; renderReq(); $('#pReq').classList.add('open'); history.pushState({req:1},''); }
+function closeReq(){ $('#pReq').classList.remove('open'); }
+$('#bReqBack').onclick=()=>{ if(history.state&&history.state.req) history.back(); else closeReq(); };
+window.addEventListener('popstate',()=>closeReq());
 
 /* ---------- contatto del PV (SiteContact / Phone dalla lista SharePoint) ---------- */
 function esc(t){ return String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -380,6 +426,7 @@ function renderSheet(){
   $('#bSend').disabled=!ok;
   $('#bSend').textContent = photos.length ? `Invia ${photos.length} foto all'archivio` : 'Invia foto';
   $('#howto').innerHTML = contactHtml(sel);
+  $('#bMario').disabled=!CONTACTS;
 }
 
 /* ---------- avvio ---------- */
