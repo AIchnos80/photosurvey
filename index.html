@@ -59,6 +59,9 @@
   .rq .h{display:flex;justify-content:space-between;gap:8px;font-weight:700;color:var(--navy)}
   .rq .o{margin:6px 0 4px;line-height:1.35}
   .rq .m{font-size:13px;color:#667}
+  .rq.ex{background:#fff8d6;border-left-color:#e0b100}
+  .rq .late{color:#c62828}
+  .exl{background:#fff8d6;padding:0 4px;border-radius:4px}
   .empty{text-align:center;color:#667;padding:48px 16px;line-height:1.5}
   .empty b{display:block;font-size:40px;margin-bottom:8px}
   .tip{flex:0 0 52px;display:flex} .btn.mini{flex:1;padding:14px 0;font-size:18px} .btn.mini:disabled{pointer-events:none}
@@ -375,26 +378,35 @@ $('#iPw').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#bPwOk').click(
 /* ---------- Modalità Super Mario Bros: richieste non evase (requests.enc.json, cifrato con la stessa chiave) ---------- */
 async function loadReq(){
   try{
-    const e=await fetch('requests.enc.json',{cache:'no-cache'}).then(r=>{ if(!r.ok) throw 0; return r.json(); });
-    const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64d(e.iv)},CKEY,b64d(e.ct));
+    const j=await fetch(RELAY_URL+'?req=1&t='+Date.now()).then(r=>r.json());
+    if(!j.ok||!j.data){ REQ=REQ||{pv:{}}; throw 0; }
+    const e=JSON.parse(j.data);
+    let pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64d(e.iv)},CKEY,b64d(e.ct));
+    if(e.gz) pt=await new Response(new Blob([pt]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
     REQ=JSON.parse(new TextDecoder().decode(pt));
   }catch(err){ REQ=REQ||{pv:{}}; }
   if($('#pReq').classList.contains('open')) renderReq();
 }
 const fmtD=d=>{ const m=String(d||'').match(/^(\d{4})-(\d\d)-(\d\d)/); return m?`${m[3]}/${m[2]}/${m[1]}`:(d||''); };
+const NOFORF=['EXTRA','IMPEGNO MATERIALE','INTERVENTO LISTINO','APERTO IN GARANZIA'];
+const fmtDT=d=>{ const m=String(d||'').match(/^(\d{4})-(\d\d)-(\d\d)(?:T(\d\d):(\d\d))?/); return m?`${m[3]}/${m[2]}/${m[1]}${m[4]?' '+m[4]+':'+m[5]:''}`:(d||''); };
 function renderReq(){
   if(!sel) return;
   $('#rId').textContent=sel.id; $('#rId').className='badge'+(sel.c==='Q8'?'':' eni');
   $('#rCo').textContent=sel.c; $('#rAddr').textContent=sel.a.replace(/^\d+\s/,'');
-  $('#rUpd').textContent = REQ&&REQ.aggiornato ? `Elenco aggiornato al ${fmtD(REQ.aggiornato)}` : '';
   const list=(REQ&&REQ.pv&&REQ.pv[sel.id])||[];
+  const nx=list.filter(r=>NOFORF.includes(String(r.stato||'').toUpperCase())).length;
+  $('#rUpd').innerHTML = REQ&&REQ.aggiornato ? `Aggiornato al ${esc(fmtDT(REQ.aggiornato))}`
+     +(list.length?` · ${list.length} richieste${nx?` (<span class="exl">${nx} extra/listino</span>)`:''}`:'') : '';
+  const now=new Date().toISOString().slice(0,16);
   $('#rList').innerHTML = !REQ ? '<div class="empty"><span class="spin"></span></div>'
-    : list.length ? list.map(r=>`<div class="rq"><div class="h"><span>${esc(r.n||'Richiesta')}</span><span>${esc(fmtD(r.data))}</span></div>`
-        +`<div class="o">${esc(r.ogg||'')}</div>`
-        +(r.stato||r.note?`<div class="m">${esc([r.stato,r.note].filter(Boolean).join(' · '))}</div>`:'')+`</div>`).join('')
+    : list.length ? list.map(r=>{ const ex=NOFORF.includes(String(r.stato||'').toUpperCase()); const late=r.scad&&r.scad<now;
+        return `<div class="rq${ex?' ex':''}"><div class="h"><span>${esc(r.n||'Richiesta')}</span><span class="${late?'late':''}">${r.scad?'⏱ '+esc(fmtDT(r.scad)):''}</span></div>`
+        +`<div class="o">${esc(r.desc||r.ogg||'')}</div>`
+        +`<div class="m">${esc([r.stato,r.note].filter(Boolean).join(' · '))}</div></div>`; }).join('')
     : '<div class="empty"><b>🍄</b>Nessuna richiesta non evasa<br>per questo punto vendita.</div>';
 }
-function openReq(){ if(!sel) return; renderReq(); $('#pReq').classList.add('open'); history.pushState({req:1},''); }
+function openReq(){ if(!sel) return; renderReq(); loadReq(); $('#pReq').classList.add('open'); history.pushState({req:1},''); }
 function closeReq(){ $('#pReq').classList.remove('open'); }
 $('#bReqBack').onclick=()=>{ if(history.state&&history.state.req) history.back(); else closeReq(); };
 window.addEventListener('popstate',()=>closeReq());
