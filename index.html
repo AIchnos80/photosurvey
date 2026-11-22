@@ -40,6 +40,8 @@
   .row{display:flex;align-items:center;gap:8px}
   .badge{background:var(--navy);color:#fff;border-radius:8px;padding:3px 9px;font-weight:700}
   .badge.eni{background:var(--eni);color:#1b1b1b}
+  .man{background:#eef1f6;color:var(--navy);border-radius:8px;padding:3px 8px;font-size:13px;font-weight:600}
+  .man:empty{display:none}
   .x{margin-left:auto;border:0;background:#eef0f3;border-radius:50%;width:34px;height:34px;font-size:18px}
   .addr{font-weight:600;margin:10px 0 4px}
   .muted{color:var(--muted);font-size:13px}
@@ -109,7 +111,7 @@
 <button class="fab" id="near" title="PV più vicino" aria-label="PV più vicino">◎</button>
 
 <section class="sheet" id="sheet" aria-live="polite">
-  <div class="row"><span class="badge" id="sId"></span><span class="muted" id="sCo"></span><button class="x" id="sClose" aria-label="Chiudi">×</button></div>
+  <div class="row"><span class="badge" id="sId"></span><span class="muted" id="sCo"></span><span class="man" id="sMan" title="Manutentore"></span><button class="x" id="sClose" aria-label="Chiudi">×</button></div>
   <div class="addr" id="sAddr"></div>
   <div class="muted" id="sDist"></div>
   <div class="err" id="sNoDir" hidden>Questo PV non ha una cartella di archivio nell'elenco SharePoint: le foto verrebbero rifiutate.</div>
@@ -127,7 +129,7 @@
 
 <section class="page" id="pReq" aria-label="Richieste non evase">
   <header><button class="back" id="bReqBack" aria-label="Indietro">←</button><h2>🔧 Richieste non evase</h2></header>
-  <div class="pvh"><div class="row"><span class="badge" id="rId"></span><span class="muted" id="rCo"></span></div><div id="rAddr" style="margin-top:6px;font-weight:600"></div><div class="muted" id="rUpd" style="margin-top:4px;font-size:13px"></div></div>
+  <div class="pvh"><div class="row"><span class="badge" id="rId"></span><span class="muted" id="rCo"></span><span class="man" id="rMan" title="Manutentore"></span></div><div id="rAddr" style="margin-top:6px;font-weight:600"></div><div class="muted" id="rUpd" style="margin-top:4px;font-size:13px"></div></div>
   <div class="list" id="rList"></div>
 </section>
 <div class="modal" id="mUser">
@@ -396,7 +398,7 @@ const fmtDT=d=>{ const m=String(d||'').match(/^(\d{4})-(\d\d)-(\d\d)(?:T(\d\d):(
 function renderReq(){
   if(!sel) return;
   $('#rId').textContent=sel.id; $('#rId').className='badge'+(sel.c==='Q8'?'':' eni');
-  $('#rCo').textContent=sel.c; $('#rAddr').textContent=sel.a.replace(/^\d+\s/,'');
+  $('#rCo').textContent=sel.c; $('#rMan').textContent=sel.m?'🛠 '+sel.m:''; $('#rAddr').textContent=sel.a.replace(/^\d+\s/,'');
   const list=(REQ&&REQ.pv&&REQ.pv[sel.id])||[];
   const nx=list.filter(r=>rqKind(r)==='ex').length, np=list.filter(r=>rqKind(r)==='pg').length;
   $('#rUpd').innerHTML = REQ&&REQ.aggiornato ? `Aggiornato al ${esc(fmtDT(REQ.aggiornato))}`
@@ -431,7 +433,7 @@ function contactHtml(p){
 function renderSheet(){
   if(!sel) return;
   $('#sId').textContent=sel.id; $('#sId').className='badge'+(sel.c==='Q8'?'':' eni');
-  $('#sCo').textContent=sel.c; $('#sAddr').textContent=sel.a.replace(/^\d+\s/,'');
+  $('#sCo').textContent=sel.c; $('#sMan').textContent=sel.m?'🛠 '+sel.m:''; $('#sAddr').textContent=sel.a.replace(/^\d+\s/,'');
   $('#sDist').textContent = me ? `a ${dist(me[0],me[1],sel.lat,sel.lon).toFixed(1)} km da te` : '';
   $('#sNoDir').hidden=!!sel.d; $('#bCam').disabled=$('#bGal').disabled=!sel.d;
   const t=$('#thumbs'); t.innerHTML='';
