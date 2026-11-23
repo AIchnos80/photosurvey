@@ -167,7 +167,7 @@
     <div class="blk"><h3>✨ Sunto lavorazioni con Gemini</h3>
       <ol class="steps">
         <li>Tocca <b>Prepara sunto con Gemini</b>: il messaggio con i dati della richiesta viene copiato e si apre Gemini.</li>
-        <li>In Gemini <b>incolla</b> il messaggio, allega le <b>foto</b> e <b>detta</b> a voce i lavori fatti, poi invia.</li>
+        <li>In Gemini apri una <b>nuova chat</b> (✏️), <b>incolla</b> il messaggio, allega le <b>foto</b> e <b>detta</b> a voce i lavori fatti, poi invia.</li>
         <li><b>Copia</b> il sunto di Gemini, apri <span id="dPortal">Siebel / RAM</span> e incollalo nella descrizione intervento.</li>
       </ol>
       <button class="btn a" id="bGem" style="width:100%">✨ Prepara sunto con Gemini</button>
@@ -487,12 +487,13 @@ let DREQ=null;
 function gemPrompt(r){
   const noTel=s=>String(s||'').replace(/\+?\d[\d -]{7,}\d/g,'[tel]').trim();
   const portale=r.src==='Q8'?'Siebel (Q8)':(r.src==='ENILIVE'?'Retail Asset Manager (ENILIVE)':'del gestore');
-  return `Sei un tecnico manutentore di impianti di distribuzione carburanti. Ti allego le foto dell'intervento e ti descrivo a voce i lavori eseguiti.\n`
-   +`Scrivi il sunto dei lavori eseguiti da incollare nel campo "descrizione intervento" del portale ${portale}.\n`
-   +`Regole: italiano tecnico, frasi brevi, massimo 600 caratteri; indica attività svolte, componenti sostituiti o riparati, prove di funzionamento ed esito; non inventare nulla che non si veda nelle foto o che non ti dica io; niente nomi di persone né numeri di telefono; rispondi solo con il testo finale, senza introduzioni.\n\n`
-   +`Dati della richiesta:\nPV ${sel.id} – ${sel.c} – ${sel.a.replace(/^\d+\s/,'')}\n`
-   +`Richiesta ${r.n||''}${r.stato||r.tipo?' ('+[r.stato,r.tipo].filter(Boolean).join(' · ')+')':''}\n`
-   +`Problema segnalato: ${noTel(r.desc||r.ogg)}`;
+  const guasto=noTel(r.desc||r.ogg);
+  return `NUOVO INTERVENTO: ignora richieste, foto e testi precedenti di questa chat e della tua memoria.\n`
+   +`Sei un tecnico manutentore di impianti carburanti. Ti invio le foto dell'intervento e ti descrivo a voce i lavori eseguiti.\n`
+   +`Scrivi SOLO la descrizione dei lavori eseguiti, da incollare nella chiusura dell'intervento sul portale ${portale}.\n`
+   +`Regole: italiano tecnico, stile sintetico, massimo 300 caratteri; solo attività svolte, materiali sostituiti ed esito delle prove; `
+   +`NON indicare punto vendita, località, indirizzo, numero di richiesta, date o nomi (sono già nel portale); non inventare nulla; nessuna introduzione né commento.`
+   +(guasto?`\nGuasto segnalato (solo come contesto, non ripeterlo): ${guasto}`:'');
 }
 async function copyText(t){ try{ await navigator.clipboard.writeText(t); return true; }catch(e){
   const ta=document.createElement('textarea'); ta.value=t; ta.style.cssText='position:fixed;opacity:0'; document.body.appendChild(ta); ta.select();
