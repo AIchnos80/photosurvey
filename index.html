@@ -57,7 +57,7 @@
   .page{position:fixed;inset:0;z-index:1500;background:#f5f6f8;display:none;flex-direction:column}
   .page.open{display:flex}
   .page header{position:relative;z-index:auto;display:flex;align-items:center;gap:10px;padding:14px 14px 12px;background:var(--navy);color:#fff;padding-top:max(14px,env(safe-area-inset-top))}
-  .page header h2{margin:0;font-size:17px;flex:1}
+  .page header h2{margin:0;font-size:17px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .page header .back{background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:10px;width:40px;height:40px;font-size:20px}
   .page .pvh{padding:12px 16px;background:#fff;border-bottom:1px solid #e4e7ec}
   .page .list{flex:1;overflow:auto;padding:12px 16px 24px}
@@ -70,6 +70,23 @@
   .exl{background:#fff8d6;padding:0 4px;border-radius:4px}
   .rq.pg{background:#dcf5f5;border-left-color:#1fa5a5}
   .pgl{background:#dcf5f5;padding:0 4px;border-radius:4px}
+  .sw{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent}
+  .sw input{position:absolute;opacity:0;width:0;height:0}
+  .sw .track{width:46px;height:26px;border-radius:13px;background:rgba(255,255,255,.3);position:relative;transition:background .2s;flex:none}
+  .sw .track::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+  .sw input:checked+.track{background:var(--amber)}
+  .sw input:checked+.track::after{transform:translateX(20px)}
+  .sw input:focus-visible+.track{outline:2px solid #fff;outline-offset:2px}
+  .sw .swl{font-size:12px;line-height:1.1;text-align:right;min-width:52px}
+  .rq{cursor:pointer;position:relative;padding-right:30px}
+  .rq::after{content:'›';position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:22px;color:#99a}
+  .rq:active{filter:brightness(.96)}
+  #dReq::after{content:none}
+  .det{padding:12px 16px 24px;overflow:auto;flex:1}
+  .det .blk{background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .det .blk h3{margin:0 0 6px;font-size:15px;color:var(--navy)}
+  .det .soon{font-size:13px;color:#889;background:#f1f3f6;border-radius:8px;padding:8px 10px}
+  .det textarea{width:100%;min-height:110px;border:1px solid #d9dde3;border-radius:10px;padding:10px;font:inherit;resize:vertical;background:#fafbfc}
   .empty{text-align:center;color:#667;padding:48px 16px;line-height:1.5}
   .empty b{display:block;font-size:40px;margin-bottom:8px}
   .tip{flex:0 0 52px;display:flex} .btn.mini{flex:1;padding:14px 0;font-size:18px} .btn.mini:disabled{pointer-events:none}
@@ -134,9 +151,18 @@
 </section>
 
 <section class="page" id="pReq" aria-label="Richieste non evase">
-  <header><button class="back" id="bReqBack" aria-label="Indietro">←</button><h2>🔧 Richieste non evase</h2></header>
+  <header><button class="back" id="bReqBack" aria-label="Indietro">←</button><h2>🔧 Richieste non evase</h2><label class="sw" id="rSw" title="ON = tutte le richieste · OFF = solo FORFAIT"><span class="swl" id="rAllL">Tutte</span><input type="checkbox" id="rAll" checked aria-label="Mostra tutte le richieste (ON) oppure solo FORFAIT (OFF)"><span class="track"></span></label></header>
   <div class="pvh"><div class="row"><span class="badge" id="rId"></span><span class="muted" id="rCo"></span><span class="man" id="rMan" title="Manutentore"></span></div><div id="rAddr" style="margin-top:6px;font-weight:600"></div><div class="muted" id="rUpd" style="margin-top:4px;font-size:13px"></div></div>
   <div class="list" id="rList"></div>
+</section>
+<section class="page" id="pDet" aria-label="Dettagli Intervento">
+  <header><button class="back" id="bDetBack" aria-label="Indietro">←</button><h2>📝 Dettagli Intervento</h2></header>
+  <div class="det">
+    <div class="rq" id="dReq" style="cursor:default;padding-right:14px"></div>
+    <div class="blk"><h3>📷 Foto intervento</h3><div class="soon">... in arrivo</div></div>
+    <div class="blk"><h3>🎙️ Note vocali</h3><div class="soon">... in arrivo</div></div>
+    <div class="blk"><h3>✨ Sunto lavorazioni</h3><div class="soon">... in arrivo</div></div>
+  </div>
 </section>
 <div class="modal" id="mUser">
   <div class="card">
@@ -415,22 +441,38 @@ function renderReq(){
   if(!sel) return;
   $('#rId').textContent=sel.id; $('#rId').className='badge'+(sel.c==='Q8'?'':' eni');
   $('#rCo').textContent=sel.c; $('#rMan').textContent=manOf(sel); $('#rAddr').textContent=sel.a.replace(/^\d+\s/,'');
-  const list=(REQ&&REQ.pv&&REQ.pv[sel.id])||[];
+  const all=(REQ&&REQ.pv&&REQ.pv[sel.id])||[], onlyF=!$('#rAll').checked;
+  const list=onlyF?all.filter(r=>rqKind(r)===''):all; RLIST=list;
   const nx=list.filter(r=>rqKind(r)==='ex').length, np=list.filter(r=>rqKind(r)==='pg').length;
   $('#rUpd').innerHTML = REQ&&REQ.aggiornato ? `Aggiornato al ${esc(fmtDT(REQ.aggiornato))}`
-     +(list.length?` · ${list.length} richieste${nx||np?' ('+[nx?`<span class="exl">${nx} extra/listino</span>`:'',np?`<span class="pgl">${np} programmate</span>`:''].filter(Boolean).join(', ')+')':''}`:'') : '';
+     +(onlyF ? ` · solo FORFAIT: ${list.length} su ${all.length}`
+       : (list.length?` · ${list.length} richieste${nx||np?' ('+[nx?`<span class="exl">${nx} extra/listino</span>`:'',np?`<span class="pgl">${np} programmate</span>`:''].filter(Boolean).join(', ')+')':''}`:'')) : '';
   const now=new Date().toISOString().slice(0,16);
   $('#rList').innerHTML = !REQ ? '<div class="empty"><span class="spin"></span></div>'
-    : list.length ? list.map(r=>{ const k=rqKind(r); const late=r.scad&&r.scad<now;
-        return `<div class="rq${k?' '+k:''}"><div class="h"><span>${esc(r.n||'Richiesta')}</span><span class="${late?'late':''}">${r.scad?'⏱ '+esc(fmtDT(r.scad)):''}</span></div>`
+    : list.length ? list.map((r,i)=>{ const k=rqKind(r); const late=r.scad&&r.scad<now;
+        return `<div class="rq${k?' '+k:''}" data-i="${i}" role="button" tabindex="0"><div class="h"><span>${esc(r.n||'Richiesta')}</span><span class="${late?'late':''}">${r.scad?'⏱ '+esc(fmtDT(r.scad)):''}</span></div>`
         +`<div class="o">${esc(r.desc||r.ogg||'')}</div>`
         +`<div class="m">${esc([r.stato,r.tipo,r.note].filter(Boolean).join(' · '))}</div></div>`; }).join('')
+    : onlyF&&all.length ? '<div class="empty"><b>🍄</b>Nessuna richiesta FORFAIT<br>per questo punto vendita.</div>'
     : '<div class="empty"><b>🍄</b>Nessuna richiesta non evasa<br>per questo punto vendita.</div>';
 }
-function openReq(){ if(!sel) return; renderReq(); loadReq(); $('#pReq').classList.add('open'); history.pushState({req:1},''); }
+let RLIST=[];
+$('#rAll').onchange=()=>{ const on=$('#rAll').checked; $('#rAllL').textContent=on?'Tutte':'FORFAIT'; toast(on?'ON: tutte le richieste':'OFF: solo FORFAIT (no programmate, no extra)',2200); renderReq(); };
+$('#rList').onclick=e=>{ const c=e.target.closest('.rq[data-i]'); if(c) openDet(RLIST[+c.dataset.i]); };
+$('#rList').onkeydown=e=>{ if(e.key==='Enter'){ const c=e.target.closest('.rq[data-i]'); if(c) openDet(RLIST[+c.dataset.i]); } };
+// Pagina "Dettagli Intervento" (predisposta per foto, audio e sunto AI)
+function openDet(r){ if(!r) return; const k=rqKind(r);
+  $('#dReq').className='rq'+(k?' '+k:'');
+  $('#dReq').innerHTML=`<div class="h"><span>${esc(r.n||'Richiesta')}</span><span>${r.scad?'⏱ '+esc(fmtDT(r.scad)):''}</span></div>`
+    +`<div class="m" style="margin-top:4px">PV ${esc(sel.id)} · ${esc(sel.c)} · ${esc(sel.a.replace(/^\d+\s/,''))}</div>`
+    +`<div class="o">${esc(r.desc||r.ogg||'')}</div><div class="m">${esc([r.stato,r.tipo,r.src].filter(Boolean).join(' · '))}</div>`;
+  $('#pDet').classList.add('open'); history.pushState({det:1},''); }
+function closeDet(){ $('#pDet').classList.remove('open'); }
+$('#bDetBack').onclick=()=>{ if(history.state&&history.state.det) history.back(); else closeDet(); };
+function openReq(){ if(!sel) return; $('#rAll').checked=true; $('#rAllL').textContent='Tutte'; renderReq(); loadReq(); $('#pReq').classList.add('open'); history.pushState({req:1},''); }
 function closeReq(){ $('#pReq').classList.remove('open'); }
 $('#bReqBack').onclick=()=>{ if(history.state&&history.state.req) history.back(); else closeReq(); };
-window.addEventListener('popstate',()=>closeReq());
+window.addEventListener('popstate',()=>{ if($('#pDet').classList.contains('open')) closeDet(); else closeReq(); });
 
 /* ---------- contatto del PV (SiteContact / Phone dalla lista SharePoint) ---------- */
 function esc(t){ return String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
