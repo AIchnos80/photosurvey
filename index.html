@@ -44,6 +44,10 @@
   .man:empty{display:none}
   .x{margin-left:auto;border:0;background:#eef0f3;border-radius:50%;width:34px;height:34px;font-size:18px}
   .addr{font-weight:600;margin:10px 0 4px}
+  .navrow{align-items:flex-start}
+  .nav{flex:1;min-width:0;cursor:pointer;border-radius:12px;margin:-6px;padding:6px;-webkit-tap-highlight-color:transparent}
+  .nav:active{background:#eef3fb}
+  .navpin{font-size:18px;line-height:1}
   .muted{color:var(--muted);font-size:13px}
   .err{color:var(--err);font-size:13px}
   .btns{display:flex;gap:8px;margin-top:14px}
@@ -111,8 +115,10 @@
 <button class="fab" id="near" title="PV più vicino" aria-label="PV più vicino">◎</button>
 
 <section class="sheet" id="sheet" aria-live="polite">
-  <div class="row"><span class="badge" id="sId"></span><span class="muted" id="sCo"></span><span class="man" id="sMan" title="Manutentore"></span><button class="x" id="sClose" aria-label="Chiudi">×</button></div>
-  <div class="addr" id="sAddr"></div>
+  <div class="row navrow"><div class="nav" id="sNav" role="link" tabindex="0" title="Naviga verso il punto vendita">
+    <div class="row"><span class="badge" id="sId"></span><span class="navpin" aria-hidden="true">📍</span><span class="muted" id="sCo"></span><span class="man" id="sMan" title="Manutentore"></span></div>
+    <div class="addr" id="sAddr"></div>
+  </div><button class="x" id="sClose" aria-label="Chiudi">×</button></div>
   <div class="muted" id="sDist"></div>
   <div class="err" id="sNoDir" hidden>Questo PV non ha una cartella di archivio nell'elenco SharePoint: le foto verrebbero rifiutate.</div>
   <div class="btns">
@@ -243,6 +249,15 @@ $('#near').onclick=()=>locate(()=>{
 /* ---------- foto ---------- */
 $('#bCam').onclick=()=>{ if(!user()){ openUser(); return; } $('#fCam').click(); };
 $('#bGal').onclick=()=>{ if(!user()){ openUser(); return; } $('#fGal').click(); };
+// Navigazione verso il segnaposto del PV con l'app predefinita del telefono
+function navUrl(p){
+  const ll=p.lat+','+p.lon, ua=navigator.userAgent;
+  if(/iPhone|iPad|iPod/.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1)) return 'maps://?daddr='+ll+'&dirflg=d';
+  if(/Android/.test(ua)) return 'geo:'+ll+'?q='+ll+'('+encodeURIComponent('PV '+p.id)+')';
+  return 'https://www.google.com/maps/dir/?api=1&destination='+ll+'&travelmode=driving';
+}
+function openNav(){ if(!sel||sel.lat==null) return; const u=navUrl(sel); if(u.startsWith('http')) window.open(u,'_blank'); else location.href=u; }
+$('#sNav').onclick=openNav; $('#sNav').onkeydown=e=>{ if(e.key==='Enter') openNav(); };
 $('#tMario').onclick=()=>{ if(!CONTACTS){ toast('🔒 Modalità Super Mario Bros: serve la password',2500); openUnlock(); return; } openReq(); };
 $('#fCam').onchange=e=>addFiles(e.target.files,e.target);
 $('#fGal').onchange=e=>addFiles(e.target.files,e.target);
