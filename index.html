@@ -91,6 +91,17 @@
   .det details.pv{margin-top:10px;font-size:13px}
   .det details.pv summary{color:var(--navy);cursor:pointer}
   .det pre{white-space:pre-wrap;background:#f1f3f6;border-radius:8px;padding:8px 10px;font:12px/1.4 ui-monospace,monospace;margin:6px 0 0}
+  .det .row2{display:flex;gap:8px}
+  .det .row2 .btn{flex:1}
+  .det .rec{background:#c62828!important;color:#fff!important}
+  .dthumbs{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .dthumbs div{position:relative;width:64px;height:64px;border-radius:8px;overflow:hidden;background:#eee}
+  .dthumbs img{width:100%;height:100%;object-fit:cover}
+  .dthumbs button,.drec .x2{position:absolute;top:2px;right:2px;width:22px;height:22px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:14px;line-height:22px;padding:0}
+  .drec{display:flex;align-items:center;gap:6px;margin-top:8px}
+  .drec[hidden]{display:none}
+  .drec audio{flex:1;min-width:0}
+  .drec .x2{position:static;flex:none;width:30px;height:30px;line-height:30px;font-size:18px}
   .det textarea{width:100%;min-height:110px;border:1px solid #d9dde3;border-radius:10px;padding:10px;font:inherit;resize:vertical;background:#fafbfc}
   .empty{text-align:center;color:#667;padding:48px 16px;line-height:1.5}
   .empty b{display:block;font-size:40px;margin-bottom:8px}
@@ -166,14 +177,17 @@
     <div class="rq" id="dReq" style="cursor:default;padding-right:14px"></div>
     <div class="blk"><h3>✨ Sunto lavorazioni con Gemini</h3>
       <ol class="steps">
-        <li>Tocca <b>Prepara sunto con Gemini</b>: il messaggio con i dati della richiesta viene copiato e si apre Gemini.</li>
-        <li>In Gemini apri una <b>nuova chat</b> (✏️), <b>incolla</b> il messaggio, allega le <b>foto</b> e <b>detta</b> a voce i lavori fatti, poi invia.</li>
+        <li>Scatta le <b>foto</b> e registra la <b>descrizione a voce</b> dei lavori fatti.</li>
+        <li>Tocca <b>Invia a Gemini</b> e scegli <b>Gemini</b> nell'elenco: arrivano foto, audio e istruzioni (le istruzioni sono anche copiate: se mancano, in Gemini tieni premuto e scegli Incolla).</li>
         <li><b>Copia</b> il sunto di Gemini, apri <span id="dPortal">Siebel / RAM</span> e incollalo nella descrizione intervento.</li>
       </ol>
-      <button class="btn a" id="bGem" style="width:100%">✨ Prepara sunto con Gemini</button>
-      <button class="btn s" id="bGemShare" style="width:100%;margin-top:8px;display:none">📤 Condividi il messaggio con…</button>
+      <div class="row2"><button class="btn s" id="bDetCam">📷 Scatta foto</button><button class="btn s" id="bDetRec">🎙️ Registra</button></div>
+      <input type="file" id="fDetCam" accept="image/*" capture="environment" hidden>
+      <div class="dthumbs" id="dThumbs"></div>
+      <div class="drec" id="dRec" hidden><audio id="dAudio" controls></audio><button class="mini x2" id="bRecDel" aria-label="Elimina registrazione">×</button></div>
+      <button class="btn a" id="bGem" style="width:100%;margin-top:10px">✨ Invia a Gemini</button>
       <details class="pv"><summary>Vedi il messaggio per Gemini</summary><pre id="dPrompt"></pre></details>
-      <div class="soon" style="margin-top:10px">Foto e audio non vengono salvati da questa app: restano solo nella chat di Gemini, secondo le impostazioni del tuo account Google.</div>
+      <div class="soon" style="margin-top:10px">Foto e audio restano solo in memoria finché sei in questa pagina: l'app non li salva e li cancella quando esci. In Gemini restano nella chat, secondo le impostazioni del tuo account Google.</div>
     </div>
   </div>
 </section>
@@ -480,7 +494,7 @@ function openDet(r){ if(!r) return; const k=rqKind(r);
     +`<div class="m" style="margin-top:4px">PV ${esc(sel.id)} · ${esc(sel.c)} · ${esc(sel.a.replace(/^\d+\s/,''))}</div>`
     +`<div class="o">${esc(r.desc||r.ogg||'')}</div><div class="m">${esc([r.stato,r.tipo,r.src].filter(Boolean).join(' · '))}</div>`;
   DREQ=r; $('#dPrompt').textContent=gemPrompt(r); $('#dPortal').textContent=r.src==='Q8'?'Siebel':(r.src==='ENILIVE'?'RAM':'Siebel / RAM');
-  $('#bGemShare').style.display=navigator.share?'':'none';
+  detReset();
   $('#pDet').classList.add('open'); history.pushState({det:1},''); }
 let DREQ=null;
 // Messaggio per Gemini: dati della richiesta + istruzioni (senza numeri di telefono)
@@ -504,11 +518,47 @@ function openGemini(){
   else if(/iPhone|iPad|iPod/.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1)) location.href='https://gemini.google.com/app';
   else window.open('https://gemini.google.com/app','_blank');
 }
-$('#bGem').onclick=async()=>{ if(!DREQ) return; const ok=await copyText(gemPrompt(DREQ));
-  toast(ok?'📋 Messaggio copiato: in Gemini tieni premuto e scegli Incolla':'Copia non riuscita: apri "Vedi il messaggio" e copialo a mano',3500);
+// Foto e nota vocale per Gemini: solo in memoria, mai salvate
+let DFOTO=[], DAUDIO=null, DREC=null, DRECT=null;
+function detReset(){ DFOTO.forEach(f=>URL.revokeObjectURL(f.url)); DFOTO=[]; if(DREC&&DREC.state!=='inactive'){ DREC.onstop=null; DREC.stop(); } DREC=null;
+  if(DAUDIO) URL.revokeObjectURL(DAUDIO.url); DAUDIO=null; clearInterval(DRECT); renderDet(); }
+function renderDet(){
+  $('#dThumbs').innerHTML=DFOTO.map((f,i)=>`<div><img src="${f.url}" alt=""><button data-i="${i}" aria-label="Elimina foto">×</button></div>`).join('');
+  $('#dRec').hidden=!DAUDIO; if(DAUDIO) $('#dAudio').src=DAUDIO.url;
+  const rec=DREC&&DREC.state==='recording';
+  $('#bDetRec').classList.toggle('rec',rec); if(!rec) $('#bDetRec').textContent=DAUDIO?'🎙️ Registra di nuovo':'🎙️ Registra';
+  $('#bDetCam').textContent=DFOTO.length?`📷 Scatta foto (${DFOTO.length})`:'📷 Scatta foto';
+}
+$('#bDetCam').onclick=()=>$('#fDetCam').click();
+$('#fDetCam').onchange=async e=>{ for(const f of e.target.files){ try{ const b=await shrink(f); DFOTO.push({file:new File([b],`foto${DFOTO.length+1}.jpg`,{type:'image/jpeg'}),url:URL.createObjectURL(b)}); }catch(_){ DFOTO.push({file:f,url:URL.createObjectURL(f)}); } } e.target.value=''; renderDet(); };
+$('#dThumbs').onclick=e=>{ const b=e.target.closest('button[data-i]'); if(!b) return; const f=DFOTO.splice(+b.dataset.i,1)[0]; URL.revokeObjectURL(f.url); renderDet(); };
+$('#bRecDel').onclick=()=>{ if(DAUDIO) URL.revokeObjectURL(DAUDIO.url); DAUDIO=null; renderDet(); };
+$('#bDetRec').onclick=async()=>{
+  if(DREC&&DREC.state==='recording'){ DREC.stop(); return; }
+  if(!navigator.mediaDevices||!window.MediaRecorder){ toast('Registrazione non supportata su questo telefono: detta la descrizione direttamente in Gemini',3500); return; }
+  let st; try{ st=await navigator.mediaDevices.getUserMedia({audio:true}); }catch(e){ toast('Microfono non disponibile: consenti l\'accesso al microfono',3000); return; }
+  const mt=['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg'].find(t=>MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(t))||'';
+  const chunks=[]; DREC=new MediaRecorder(st,mt?{mimeType:mt}:{}); const t0=Date.now();
+  DREC.ondataavailable=e=>{ if(e.data.size) chunks.push(e.data); };
+  DREC.onstop=()=>{ st.getTracks().forEach(t=>t.stop()); clearInterval(DRECT);
+    const type=(DREC.mimeType||mt||'audio/webm').split(';')[0], ext=/mp4/.test(type)?'m4a':(/ogg/.test(type)?'ogg':'weba');
+    const b=new Blob(chunks,{type}); if(DAUDIO) URL.revokeObjectURL(DAUDIO.url);
+    DAUDIO={file:new File([b],'descrizione.'+ext,{type}),url:URL.createObjectURL(b)}; renderDet(); };
+  DREC.start(); renderDet();
+  DRECT=setInterval(()=>{ const s=Math.round((Date.now()-t0)/1000); $('#bDetRec').textContent=`⏹ Stop ${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; if(s>=300) DREC.stop(); },500);
+  $('#bDetRec').textContent='⏹ Stop 0:00';
+};
+$('#bGem').onclick=async()=>{ if(!DREQ) return;
+  if(DREC&&DREC.state==='recording'){ toast('Ferma prima la registrazione',2500); return; }
+  const txt=gemPrompt(DREQ), ok=await copyText(txt);
+  const files=DFOTO.map(f=>f.file).concat(DAUDIO?[DAUDIO.file]:[]);
+  if(files.length&&navigator.canShare&&navigator.canShare({files})){
+    try{ toast('Scegli Gemini nell\'elenco',2500); await navigator.share({files,text:txt}); return; }
+    catch(e){ if(e&&e.name==='AbortError') return; }
+  }
+  toast(files.length?'Il telefono non permette di inviare i file: in Gemini allegali a mano. Messaggio copiato: Incolla':(ok?'📋 Messaggio copiato: in Gemini tieni premuto e scegli Incolla':'Copia non riuscita: apri "Vedi il messaggio" e copialo a mano'),4000);
   setTimeout(openGemini,700); };
-$('#bGemShare').onclick=async()=>{ if(!DREQ) return; try{ await navigator.share({title:'Sunto intervento '+(DREQ.n||''),text:gemPrompt(DREQ)}); }catch(e){} };
-function closeDet(){ $('#pDet').classList.remove('open'); }
+function closeDet(){ detReset(); $('#pDet').classList.remove('open'); }
 $('#bDetBack').onclick=()=>{ if(history.state&&history.state.det) history.back(); else closeDet(); };
 function openReq(){ if(!sel) return; $('#rAll').checked=true; $('#rAllL').textContent='Tutte'; renderReq(); loadReq(); $('#pReq').classList.add('open'); history.pushState({req:1},''); }
 function closeReq(){ $('#pReq').classList.remove('open'); }
