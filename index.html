@@ -175,6 +175,10 @@
   <header><button class="back" id="bDetBack" aria-label="Indietro">←</button><h2>📝 Dettagli Intervento</h2></header>
   <div class="det">
     <div class="rq" id="dReq" style="cursor:default;padding-right:14px"></div>
+    <div class="blk" id="dDuvri"><h3>📄 DUVRI</h3>
+      <button class="btn s" id="bDuvri" style="width:100%">📄 Compila DUVRI pdf</button>
+      <div class="soon" id="dDuvriNo" style="display:none">Modello DUVRI ENILIVE ... in arrivo</div>
+    </div>
     <div class="blk"><h3>✨ Sunto lavorazioni con Gemini</h3>
       <ol class="steps">
         <li>Scatta le <b>foto</b> e registra la <b>descrizione a voce</b> dei lavori fatti.</li>
@@ -495,6 +499,7 @@ function openDet(r){ if(!r) return; const k=rqKind(r);
     +`<div class="o">${esc(r.desc||r.ogg||'')}</div><div class="m">${esc([r.stato,r.tipo,r.src].filter(Boolean).join(' · '))}</div>`;
   DREQ=r; $('#dPrompt').textContent=gemPrompt(r); $('#dPortal').textContent=r.src==='Q8'?'Siebel':(r.src==='ENILIVE'?'RAM':'Siebel / RAM');
   detReset();
+  const q8=r.src==='Q8'; $('#bDuvri').style.display=q8?'':'none'; $('#dDuvriNo').style.display=q8?'none':'';
   $('#pDet').classList.add('open'); history.pushState({det:1},''); }
 let DREQ=null;
 // Messaggio per Gemini: dati della richiesta + istruzioni (senza numeri di telefono)
@@ -565,7 +570,15 @@ $('#bDetBack').onclick=()=>{ if(history.state&&history.state.det) history.back()
 function openReq(){ if(!sel) return; $('#rAll').checked=true; $('#rAllL').textContent='Tutte'; renderReq(); loadReq(); $('#pReq').classList.add('open'); history.pushState({req:1},''); }
 function closeReq(){ $('#pReq').classList.remove('open'); }
 $('#bReqBack').onclick=()=>{ if(history.state&&history.state.req) history.back(); else closeReq(); };
-window.addEventListener('popstate',()=>{ if($('#pDet').classList.contains('open')) closeDet(); else closeReq(); });
+window.addEventListener('popstate',()=>{ if(window.duvriOpen&&duvriOpen()) closeDuvri(); else if($('#pDet').classList.contains('open')) closeDet(); else closeReq(); });
+// DUVRI Q8: modulo caricato solo quando serve (duvri.js + modello duvri_q8.pdf)
+function loadScript(src){ return new Promise((ok,ko)=>{ const s=document.createElement('script'); s.src=src; s.onload=ok; s.onerror=()=>ko(new Error('non disponibile')); document.head.appendChild(s); }); }
+$('#bDuvri').onclick=async()=>{ if(!DREQ||!sel) return;
+  try{ if(!window.openDuvri) await loadScript('duvri.js?v=1'); }catch(e){ toast('Modulo DUVRI non disponibile: serve la rete',3000); return; }
+  const c=CONTACTS&&CONTACTS[sel.id];
+  openDuvri(DREQ,{pv:sel.id, addr:sel.a.replace(/^\d+\s/,''), user:user(), code:userCode(user()), ref:(c&&c[0])||'',
+    archive:async(blob,name)=>{ await qAdd({siteId:sel.id,name:user(),photos:[{name,b64:await b64(blob)}],ts:Date.now()}); updPending(); processQueue(); }});
+};
 
 /* ---------- contatto del PV (SiteContact / Phone dalla lista SharePoint) ---------- */
 function esc(t){ return String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
