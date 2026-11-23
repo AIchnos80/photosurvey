@@ -86,6 +86,11 @@
   .det .blk{background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
   .det .blk h3{margin:0 0 6px;font-size:15px;color:var(--navy)}
   .det .soon{font-size:13px;color:#889;background:#f1f3f6;border-radius:8px;padding:8px 10px}
+  .det .steps{margin:4px 0 12px;padding-left:20px;line-height:1.4;font-size:14px}
+  .det .steps li{margin-bottom:4px}
+  .det details.pv{margin-top:10px;font-size:13px}
+  .det details.pv summary{color:var(--navy);cursor:pointer}
+  .det pre{white-space:pre-wrap;background:#f1f3f6;border-radius:8px;padding:8px 10px;font:12px/1.4 ui-monospace,monospace;margin:6px 0 0}
   .det textarea{width:100%;min-height:110px;border:1px solid #d9dde3;border-radius:10px;padding:10px;font:inherit;resize:vertical;background:#fafbfc}
   .empty{text-align:center;color:#667;padding:48px 16px;line-height:1.5}
   .empty b{display:block;font-size:40px;margin-bottom:8px}
@@ -159,9 +164,17 @@
   <header><button class="back" id="bDetBack" aria-label="Indietro">←</button><h2>📝 Dettagli Intervento</h2></header>
   <div class="det">
     <div class="rq" id="dReq" style="cursor:default;padding-right:14px"></div>
-    <div class="blk"><h3>📷 Foto intervento</h3><div class="soon">... in arrivo</div></div>
-    <div class="blk"><h3>🎙️ Note vocali</h3><div class="soon">... in arrivo</div></div>
-    <div class="blk"><h3>✨ Sunto lavorazioni</h3><div class="soon">... in arrivo</div></div>
+    <div class="blk"><h3>✨ Sunto lavorazioni con Gemini</h3>
+      <ol class="steps">
+        <li>Tocca <b>Prepara sunto con Gemini</b>: il messaggio con i dati della richiesta viene copiato e si apre Gemini.</li>
+        <li>In Gemini <b>incolla</b> il messaggio, allega le <b>foto</b> e <b>detta</b> a voce i lavori fatti, poi invia.</li>
+        <li><b>Copia</b> il sunto di Gemini, apri <span id="dPortal">Siebel / RAM</span> e incollalo nella descrizione intervento.</li>
+      </ol>
+      <button class="btn a" id="bGem" style="width:100%">✨ Prepara sunto con Gemini</button>
+      <button class="btn s" id="bGemShare" style="width:100%;margin-top:8px;display:none">📤 Condividi il messaggio con…</button>
+      <details class="pv"><summary>Vedi il messaggio per Gemini</summary><pre id="dPrompt"></pre></details>
+      <div class="soon" style="margin-top:10px">Foto e audio non vengono salvati da questa app: restano solo nella chat di Gemini, secondo le impostazioni del tuo account Google.</div>
+    </div>
   </div>
 </section>
 <div class="modal" id="mUser">
@@ -466,7 +479,34 @@ function openDet(r){ if(!r) return; const k=rqKind(r);
   $('#dReq').innerHTML=`<div class="h"><span>${esc(r.n||'Richiesta')}</span><span>${r.scad?'⏱ '+esc(fmtDT(r.scad)):''}</span></div>`
     +`<div class="m" style="margin-top:4px">PV ${esc(sel.id)} · ${esc(sel.c)} · ${esc(sel.a.replace(/^\d+\s/,''))}</div>`
     +`<div class="o">${esc(r.desc||r.ogg||'')}</div><div class="m">${esc([r.stato,r.tipo,r.src].filter(Boolean).join(' · '))}</div>`;
+  DREQ=r; $('#dPrompt').textContent=gemPrompt(r); $('#dPortal').textContent=r.src==='Q8'?'Siebel':(r.src==='ENILIVE'?'RAM':'Siebel / RAM');
+  $('#bGemShare').style.display=navigator.share?'':'none';
   $('#pDet').classList.add('open'); history.pushState({det:1},''); }
+let DREQ=null;
+// Messaggio per Gemini: dati della richiesta + istruzioni (senza numeri di telefono)
+function gemPrompt(r){
+  const noTel=s=>String(s||'').replace(/\+?\d[\d -]{7,}\d/g,'[tel]').trim();
+  const portale=r.src==='Q8'?'Siebel (Q8)':(r.src==='ENILIVE'?'Retail Asset Manager (ENILIVE)':'del gestore');
+  return `Sei un tecnico manutentore di impianti di distribuzione carburanti. Ti allego le foto dell'intervento e ti descrivo a voce i lavori eseguiti.\n`
+   +`Scrivi il sunto dei lavori eseguiti da incollare nel campo "descrizione intervento" del portale ${portale}.\n`
+   +`Regole: italiano tecnico, frasi brevi, massimo 600 caratteri; indica attività svolte, componenti sostituiti o riparati, prove di funzionamento ed esito; non inventare nulla che non si veda nelle foto o che non ti dica io; niente nomi di persone né numeri di telefono; rispondi solo con il testo finale, senza introduzioni.\n\n`
+   +`Dati della richiesta:\nPV ${sel.id} – ${sel.c} – ${sel.a.replace(/^\d+\s/,'')}\n`
+   +`Richiesta ${r.n||''}${r.stato||r.tipo?' ('+[r.stato,r.tipo].filter(Boolean).join(' · ')+')':''}\n`
+   +`Problema segnalato: ${noTel(r.desc||r.ogg)}`;
+}
+async function copyText(t){ try{ await navigator.clipboard.writeText(t); return true; }catch(e){
+  const ta=document.createElement('textarea'); ta.value=t; ta.style.cssText='position:fixed;opacity:0'; document.body.appendChild(ta); ta.select();
+  let ok=false; try{ ok=document.execCommand('copy'); }catch(_){} ta.remove(); return ok; } }
+function openGemini(){
+  const ua=navigator.userAgent;
+  if(/Android/.test(ua)) location.href='intent://gemini.google.com/app#Intent;scheme=https;package=com.google.android.apps.bard;S.browser_fallback_url='+encodeURIComponent('https://gemini.google.com/app')+';end';
+  else if(/iPhone|iPad|iPod/.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1)) location.href='https://gemini.google.com/app';
+  else window.open('https://gemini.google.com/app','_blank');
+}
+$('#bGem').onclick=async()=>{ if(!DREQ) return; const ok=await copyText(gemPrompt(DREQ));
+  toast(ok?'📋 Messaggio copiato: in Gemini tieni premuto e scegli Incolla':'Copia non riuscita: apri "Vedi il messaggio" e copialo a mano',3500);
+  setTimeout(openGemini,700); };
+$('#bGemShare').onclick=async()=>{ if(!DREQ) return; try{ await navigator.share({title:'Sunto intervento '+(DREQ.n||''),text:gemPrompt(DREQ)}); }catch(e){} };
 function closeDet(){ $('#pDet').classList.remove('open'); }
 $('#bDetBack').onclick=()=>{ if(history.state&&history.state.det) history.back(); else closeDet(); };
 function openReq(){ if(!sel) return; $('#rAll').checked=true; $('#rAllL').textContent='Tutte'; renderReq(); loadReq(); $('#pReq').classList.add('open'); history.pushState({req:1},''); }
