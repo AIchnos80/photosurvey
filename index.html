@@ -504,9 +504,9 @@ function gemPrompt(r){
   const guasto=noTel(r.desc||r.ogg);
   return `NUOVO INTERVENTO: ignora richieste, foto e testi precedenti di questa chat e della tua memoria.\n`
    +`Sei un tecnico manutentore di impianti carburanti. Ti invio le foto dell'intervento e ti descrivo a voce i lavori eseguiti.\n`
-   +`Scrivi SOLO la descrizione dei lavori eseguiti, da incollare nella chiusura dell'intervento sul portale ${portale}.\n`
+   +`Scrivi SOLO la descrizione dell'intervento, da incollare nella chiusura dell'intervento sul portale ${portale}.\n`
    +`La descrizione a voce può essere in italiano, inglese, spagnolo o portoghese: il testo finale deve essere SEMPRE in italiano.\n`
-   +`Regole: italiano tecnico, stile sintetico, massimo 300 caratteri; solo attività svolte, materiali sostituiti ed esito delle prove; `
+   +`Regole: italiano tecnico, stile sintetico, massimo 400 caratteri; riporta in ordine: 1) le operazioni di messa in sicurezza dell'area di lavoro, se citate (es. delimitazione e segnaletica, fermo erogazione, sezionamento elettrico, verifiche preliminari), senza tralasciarle; 2) le attività svolte e i materiali sostituiti; 3) il ripristino e l'esito delle prove; `
    +`NON indicare punto vendita, località, indirizzo, numero di richiesta, date o nomi (sono già nel portale); non inventare nulla; nessuna introduzione né commento.`
    +(guasto?`\nGuasto segnalato (solo come contesto, non ripeterlo): ${guasto}`:'');
 }
