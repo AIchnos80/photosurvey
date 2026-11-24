@@ -158,6 +158,14 @@ async function complete(){
       form.acroForm.removeField(f.acroField); });
     const font=await doc.embedFont(L.StandardFonts.Helvetica), bold=await doc.embedFont(L.StandardFonts.HelveticaBold);
     form.updateFieldAppearances(font); form.flatten();
+    // dopo flatten pdf-lib lascia nelle pagine riferimenti ai widget eliminati: le stampanti/Acrobat vedono il file come danneggiato. Li tolgo.
+    await doc.flush();
+    { const ctx=doc.context, has=r=>!!ctx.lookup(r);
+      const fixArr=a=>{ for(let i=a.size()-1;i>=0;i--){ const v=a.get(i); if(v instanceof L.PDFRef&&!has(v)) a.remove(i); } };
+      const fixDict=d=>{ for(const [k,v] of d.entries()){ if(v instanceof L.PDFRef&&!has(v)) d.delete(k); else if(v instanceof L.PDFArray) fixArr(v); else if(v instanceof L.PDFDict) fixDict(v); } };
+      for(const [,o] of ctx.enumerateIndirectObjects()){ if(o instanceof L.PDFArray) fixArr(o); else if(o instanceof L.PDFDict) fixDict(o); else if(o instanceof L.PDFStream) fixDict(o.dict); }
+      pages.forEach(p=>{ const a=p.node.lookup(L.PDFName.of('Annots')); if(a instanceof L.PDFArray&&a.size()===0) p.node.delete(L.PDFName.of('Annots')); });
+      const af=doc.catalog.lookup(L.PDFName.of('AcroForm')); if(af instanceof L.PDFDict){ af.set(L.PDFName.of('Fields'),ctx.obj([])); af.delete(L.PDFName.of('CO')); af.delete(L.PDFName.of('NeedAppearances')); } }
     marks.forEach(([p,r])=>{ const sz=Math.min(r.width,r.height)*0.95, w=bold.widthOfTextAtSize('X',sz);
       p.drawText('X',{x:r.x+(r.width-w)/2,y:r.y+(r.height-sz*0.72)/2,size:sz,font:bold,color:L.rgb(0.05,0.17,0.36)}); });
     const pg=pages[3];
