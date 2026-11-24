@@ -176,7 +176,7 @@ async function complete(){
     doc.setTitle('DUVRI '+st.pv+' '+st.rs); doc.setProducer('PhotoSurvey');
     const out=await doc.save({useObjectStreams:false});
     st.pdf=new Blob([out],{type:'application/pdf'});
-    st.name=`${yy.slice(2)}${mm}${dd}.${String(st.pv).padStart(5,'0')}.${st.ctx.code}.DUVRI.pdf`;
+    st.name=`${String(st.rs||'').replace(/[\\/:*?"<>|#%]/g,'').trim()} ${st.pv} DUVRI.pdf`;
     $('#dvName').textContent=st.name; $('#dvDone').classList.add('on'); $('#dvDone').scrollIntoView({behavior:'smooth'});
     if(st.ctx.archive){ $('#dvArch').textContent='⏳ Invio all\'archivio del PV in corso…'; try{ await st.ctx.archive(st.pdf,st.name); $('#dvArch').textContent='📁 Inviato all\'archivio del PV (o in coda se manca la rete).'; }catch(e){ $('#dvArch').textContent='⚠️ Archiviazione non riuscita: '+e.message; } }
   }catch(e){ alert('Errore nella generazione del PDF: '+e.message); }
