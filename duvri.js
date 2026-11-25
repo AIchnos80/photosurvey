@@ -222,10 +222,10 @@ async function complete(){
     marks.forEach(([p,r])=>{ const sz=Math.min(r.width,r.height)*0.95, w=bold.widthOfTextAtSize('X',sz);
       p.drawText('X',{x:r.x+(r.width-w)/2,y:r.y+(r.height-sz*0.72)/2,size:sz,font:bold,color:L.rgb(0.05,0.17,0.36)}); });
     const pg=pages[3];
-    const boxes=[[58,262,220,26],[342,262,186,26]];
+    const boxes=[[77,193,181,92],[352,195,170,90]]; // riquadri firma ampi (sopra nome e linea)
     for(const k of [0,1]){ if(!st.sig[k]) continue; const t=trimCanvas($('#dvSig'+k)); if(!t) continue;
       const png=await doc.embedPng(t.toDataURL('image/png')); const [bx,by,bw,bh]=boxes[k]; const s=Math.min(bw/png.width,bh/png.height);
-      pg.drawImage(png,{x:bx+(bw-png.width*s)/2,y:by,width:png.width*s,height:png.height*s}); }
+      pg.drawImage(png,{x:bx+(bw-png.width*s)/2,y:by+(bh-png.height*s)/2,width:png.width*s,height:png.height*s}); }
     await phPages(doc,L,clean(`Richiesta ${st.rs} - PV ${st.pv} - ${dataIt}`));
     doc.setTitle('DUVRI '+st.pv+' '+st.rs); doc.setProducer('PhotoSurvey');
     const out=await doc.save({useObjectStreams:false});
