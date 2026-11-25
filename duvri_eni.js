@@ -47,6 +47,57 @@ const css=`
 #pDuvriE .done.on{display:block}
 `;
 let st=null;
+
+// ---- Allegati fotografici: scatti fatti dalla pagina DUVRI, solo in memoria; nel PDF una pagina "Allegati fotografici" con miniature ≤ 4×4 cm ----
+const PHCSS=`
+#__ID__ header .cam{background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:10px;height:40px;min-width:52px;padding:0 10px;font-size:20px;display:flex;align-items:center;gap:4px;flex:none}
+#__ID__ header .cam .n{font-size:13px;font-weight:700;background:#e53935;border-radius:9px;padding:1px 6px;display:none}
+#__ID__ header .cam .n.on{display:inline}
+#__ID__ .phs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+#__ID__ .phs div{position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;background:#eef0f3}
+#__ID__ .phs img{width:100%;height:100%;object-fit:cover;display:block}
+#__ID__ .phs button{position:absolute;top:3px;right:3px;width:24px;height:24px;border-radius:12px;border:0;background:rgba(0,0,0,.55);color:#fff;font-size:14px;line-height:24px;padding:0}
+`;
+function phInit(sec){
+  const sty=document.createElement('style'); sty.textContent=PHCSS.split('__ID__').join(sec.id); document.head.appendChild(sty);
+  const h=sec.querySelector('header'), b=document.createElement('button'); b.className='cam'; b.setAttribute('aria-label','Scatta foto da allegare'); b.title='Scatta foto da allegare al DUVRI';
+  b.innerHTML='📷<span class="n"></span>'; h.appendChild(b);
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.setAttribute('capture','environment'); inp.multiple=true; inp.hidden=true; sec.appendChild(inp);
+  b.onclick=()=>{ inp.value=''; inp.click(); };
+  inp.onchange=()=>phAdd([...inp.files]);
+  const ok=sec.querySelector('.btn.a'); const blk=document.createElement('div'); blk.className='blk'; blk.style.display='none';
+  blk.innerHTML='<h3>📷 Allegati fotografici <span class="cnt"></span></h3><div class="phs"></div>'; ok.parentNode.insertBefore(blk,ok);
+  blk.addEventListener('click',e=>{ const x=e.target.closest('[data-del]'); if(!x) return; const i=+x.dataset.del; URL.revokeObjectURL(st.ph[i].url); st.ph.splice(i,1); phPaint(); });
+  phUI={b,blk};
+}
+let phUI=null;
+async function phAdd(files){
+  for(const f of files){ try{
+    const bmp=await createImageBitmap(f); const sc=Math.min(1,900/Math.max(bmp.width,bmp.height));
+    const c=document.createElement('canvas'); c.width=Math.round(bmp.width*sc); c.height=Math.round(bmp.height*sc); c.getContext('2d').drawImage(bmp,0,0,c.width,c.height); bmp.close&&bmp.close();
+    const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.82)); st.ph.push({blob,url:URL.createObjectURL(blob),w:c.width,h:c.height});
+  }catch(e){ window.toast&&toast('Foto non leggibile',2500); } }
+  phPaint(); if(files.length) window.toast&&toast(st.ph.length+' foto allegate al DUVRI',2000);
+}
+function phPaint(){ if(!phUI) return; const n=st.ph.length; const s=phUI.b.querySelector('.n'); s.textContent=n; s.classList.toggle('on',n>0);
+  phUI.blk.style.display=n?'':'none'; phUI.blk.querySelector('.cnt').textContent='('+n+')';
+  phUI.blk.querySelector('.phs').innerHTML=st.ph.map((p,i)=>`<div><img src="${p.url}" alt="Foto ${i+1}"><button data-del="${i}" aria-label="Elimina foto">×</button></div>`).join(''); }
+function phReset(){ if(st&&st.ph) st.ph.forEach(p=>URL.revokeObjectURL(p.url)); }
+async function phPages(doc,L,info){
+  if(!st.ph.length) return;
+  const font=await doc.embedFont(L.StandardFonts.Helvetica), bold=await doc.embedFont(L.StandardFonts.HelveticaBold);
+  const W=595.28,H=841.89,M=42,S=113.39 /* 4 cm */,G=14,CAP=12,COLS=4, cw=(W-2*M-(COLS-1)*G)/COLS, navy=L.rgb(0.05,0.17,0.36);
+  let pg=null,top=0,col=0,np=0;
+  const newPage=()=>{ pg=doc.addPage([W,H]); np++; pg.drawText('Allegati fotografici'+(np>1?' (segue)':''),{x:M,y:H-M-16,size:16,font:bold,color:navy});
+    pg.drawText(info,{x:M,y:H-M-32,size:9,font,color:L.rgb(0.3,0.3,0.35)}); top=H-M-48; col=0; };
+  for(let i=0;i<st.ph.length;i++){
+    if(!pg||(col===0&&top-S-CAP<M)) newPage();
+    const p=st.ph[i], img=await doc.embedJpg(new Uint8Array(await p.blob.arrayBuffer())), s=Math.min(S/img.width,S/img.height), w=img.width*s, h=img.height*s, x=M+col*(cw+G);
+    pg.drawImage(img,{x:x+(cw-w)/2,y:top-S+(S-h)/2,width:w,height:h});
+    const cap='Foto '+(i+1), tw=font.widthOfTextAtSize(cap,8); pg.drawText(cap,{x:x+(cw-tw)/2,y:top-S-10,size:8,font,color:L.rgb(0.3,0.3,0.35)});
+    if(++col===COLS){ col=0; top-=S+CAP+G; }
+  }
+}
 const $=s=>document.querySelector(s);
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const p2=n=>String(n).padStart(2,'0');
@@ -109,6 +160,7 @@ function build(){
       <div id="deArch" style="font-size:12px;color:#667;margin-top:8px"></div></div>
   </div>`;
   document.body.appendChild(sec);
+  phInit(sec);
   $('#bDeBack').onclick=()=>{ if(history.state&&history.state.duvriE) history.back(); else close(); };
   sec.addEventListener('click',e=>{
     const k=e.target.closest('.ck'); if(k){ const n=k.dataset.ck, v=!st.c[n]; st.c[n]=v;
@@ -141,15 +193,16 @@ window.openDuvriEni=function(r,ctx){
   const key=(ctx.pv||'')+'|'+(r.n||'');
   if(!st||st.key!==key){
     if(st) wipeSigs();
+    phReset();
     const d=today();
-    st={key,rs:r.n||'',pv:ctx.pv,c:{},sig:[false,false,false,false,false],pdf:null,name:'',ctx:{...ctx,desc:r.desc||''},
+    st={key,rs:r.n||'',pv:ctx.pv,c:{},sig:[false,false,false,false,false],ph:[],pdf:null,name:'',ctx:{...ctx,desc:r.desc||''},
       t:{'Richiesta':r.n||'','Data inizio lavoro':d,'Data prevista per la fine del lavoro':d,'Descrizione del lavoro 1':sunto(r.desc),
          'Ragione Sociale Impresa n1':'ARGELATO SRL','Nominativo del ResponsabilePreposto dellImpresa':ctx.user||'','Firma':ctx.user||'',
          'Timbro e firma del Gestore del Punto Vendita':[ctx.pv,ctx.addr].filter(Boolean).join(' - ')}};
     $('#deDone').classList.remove('on');
   }
   st.ctx={...st.ctx,...ctx,desc:r.desc||''};
-  fill(); paint();
+  fill(); paint(); phPaint();
   $('#pDuvriE').classList.add('open'); history.pushState({duvriE:1},'');
   requestAnimationFrame(sizeSig);
   $('#pDuvriE .dv').scrollTop=0;
@@ -211,6 +264,7 @@ async function complete(){
     for(const k of [0,1,2,3,4]){ if(!st.sig[k]) continue; const t=trimCanvas($('#deSig'+k)); if(!t) continue;
       const png=await doc.embedPng(t.toDataURL('image/png')); const [bx,by,bw,bh]=SIGBOX[k]; const s=Math.min(bw/png.width,bh/png.height);
       pages[0].drawImage(png,{x:bx+(bw-png.width*s)/2,y:by+(bh-png.height*s)/2,width:png.width*s,height:png.height*s}); }
+    await phPages(doc,L,clean(`Richiesta ${st.rs} - PV ${st.pv} - ${dIt(st.t['Data inizio lavoro'])}`));
     doc.setTitle('DUVRI '+st.pv+' '+st.rs); doc.setProducer('PhotoSurvey');
     const out=await doc.save({useObjectStreams:false});
     st.pdf=new Blob([out],{type:'application/pdf'});

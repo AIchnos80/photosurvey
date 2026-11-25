@@ -32,6 +32,57 @@ const css=`
 #pDuvri .done.on{display:block}
 `;
 let st=null, cur=null, lib=null;
+
+// ---- Allegati fotografici: scatti fatti dalla pagina DUVRI, solo in memoria; nel PDF una pagina "Allegati fotografici" con miniature ≤ 4×4 cm ----
+const PHCSS=`
+#__ID__ header .cam{background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:10px;height:40px;min-width:52px;padding:0 10px;font-size:20px;display:flex;align-items:center;gap:4px;flex:none}
+#__ID__ header .cam .n{font-size:13px;font-weight:700;background:#e53935;border-radius:9px;padding:1px 6px;display:none}
+#__ID__ header .cam .n.on{display:inline}
+#__ID__ .phs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+#__ID__ .phs div{position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;background:#eef0f3}
+#__ID__ .phs img{width:100%;height:100%;object-fit:cover;display:block}
+#__ID__ .phs button{position:absolute;top:3px;right:3px;width:24px;height:24px;border-radius:12px;border:0;background:rgba(0,0,0,.55);color:#fff;font-size:14px;line-height:24px;padding:0}
+`;
+function phInit(sec){
+  const sty=document.createElement('style'); sty.textContent=PHCSS.split('__ID__').join(sec.id); document.head.appendChild(sty);
+  const h=sec.querySelector('header'), b=document.createElement('button'); b.className='cam'; b.setAttribute('aria-label','Scatta foto da allegare'); b.title='Scatta foto da allegare al DUVRI';
+  b.innerHTML='📷<span class="n"></span>'; h.appendChild(b);
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.setAttribute('capture','environment'); inp.multiple=true; inp.hidden=true; sec.appendChild(inp);
+  b.onclick=()=>{ inp.value=''; inp.click(); };
+  inp.onchange=()=>phAdd([...inp.files]);
+  const ok=sec.querySelector('.btn.a'); const blk=document.createElement('div'); blk.className='blk'; blk.style.display='none';
+  blk.innerHTML='<h3>📷 Allegati fotografici <span class="cnt"></span></h3><div class="phs"></div>'; ok.parentNode.insertBefore(blk,ok);
+  blk.addEventListener('click',e=>{ const x=e.target.closest('[data-del]'); if(!x) return; const i=+x.dataset.del; URL.revokeObjectURL(st.ph[i].url); st.ph.splice(i,1); phPaint(); });
+  phUI={b,blk};
+}
+let phUI=null;
+async function phAdd(files){
+  for(const f of files){ try{
+    const bmp=await createImageBitmap(f); const sc=Math.min(1,900/Math.max(bmp.width,bmp.height));
+    const c=document.createElement('canvas'); c.width=Math.round(bmp.width*sc); c.height=Math.round(bmp.height*sc); c.getContext('2d').drawImage(bmp,0,0,c.width,c.height); bmp.close&&bmp.close();
+    const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.82)); st.ph.push({blob,url:URL.createObjectURL(blob),w:c.width,h:c.height});
+  }catch(e){ window.toast&&toast('Foto non leggibile',2500); } }
+  phPaint(); if(files.length) window.toast&&toast(st.ph.length+' foto allegate al DUVRI',2000);
+}
+function phPaint(){ if(!phUI) return; const n=st.ph.length; const s=phUI.b.querySelector('.n'); s.textContent=n; s.classList.toggle('on',n>0);
+  phUI.blk.style.display=n?'':'none'; phUI.blk.querySelector('.cnt').textContent='('+n+')';
+  phUI.blk.querySelector('.phs').innerHTML=st.ph.map((p,i)=>`<div><img src="${p.url}" alt="Foto ${i+1}"><button data-del="${i}" aria-label="Elimina foto">×</button></div>`).join(''); }
+function phReset(){ if(st&&st.ph) st.ph.forEach(p=>URL.revokeObjectURL(p.url)); }
+async function phPages(doc,L,info){
+  if(!st.ph.length) return;
+  const font=await doc.embedFont(L.StandardFonts.Helvetica), bold=await doc.embedFont(L.StandardFonts.HelveticaBold);
+  const W=595.28,H=841.89,M=42,S=113.39 /* 4 cm */,G=14,CAP=12,COLS=4, cw=(W-2*M-(COLS-1)*G)/COLS, navy=L.rgb(0.05,0.17,0.36);
+  let pg=null,top=0,col=0,np=0;
+  const newPage=()=>{ pg=doc.addPage([W,H]); np++; pg.drawText('Allegati fotografici'+(np>1?' (segue)':''),{x:M,y:H-M-16,size:16,font:bold,color:navy});
+    pg.drawText(info,{x:M,y:H-M-32,size:9,font,color:L.rgb(0.3,0.3,0.35)}); top=H-M-48; col=0; };
+  for(let i=0;i<st.ph.length;i++){
+    if(!pg||(col===0&&top-S-CAP<M)) newPage();
+    const p=st.ph[i], img=await doc.embedJpg(new Uint8Array(await p.blob.arrayBuffer())), s=Math.min(S/img.width,S/img.height), w=img.width*s, h=img.height*s, x=M+col*(cw+G);
+    pg.drawImage(img,{x:x+(cw-w)/2,y:top-S+(S-h)/2,width:w,height:h});
+    const cap='Foto '+(i+1), tw=font.widthOfTextAtSize(cap,8); pg.drawText(cap,{x:x+(cw-tw)/2,y:top-S-10,size:8,font,color:L.rgb(0.3,0.3,0.35)});
+    if(++col===COLS){ col=0; top-=S+CAP+G; }
+  }
+}
 const $=s=>document.querySelector(s);
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const p2=n=>String(n).padStart(2,'0');
@@ -69,6 +120,7 @@ function build(){
       <div id="dvArch" style="font-size:12px;color:#667;margin-top:8px"></div></div>
   </div>`;
   document.body.appendChild(sec);
+  phInit(sec);
   $('#bDvBack').onclick=()=>{ if(history.state&&history.state.duvri) history.back(); else close(); };
   sec.addEventListener('click',e=>{
     const b=e.target.closest('.q .o button'); if(b){ const q=b.closest('.q'); const v=st.r[q.dataset.f]===b.dataset.v?'':b.dataset.v; st.r[q.dataset.f]=v; paint(); return; }
@@ -105,13 +157,14 @@ window.openDuvri=function(r,ctx){
   build();
   const key=(ctx.pv||'')+'|'+(r.n||'');
   if(!st||st.key!==key){
+    phReset();
     const d=new Date();
-    st={key,rs:r.n||'',pv:ctx.pv,r:{},sig:[false,false],pdf:null,name:'',
+    st={key,rs:r.n||'',pv:ctx.pv,r:{},sig:[false,false],ph:[],pdf:null,name:'',
       f:{dvData:`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`,dvInt:tipoToInt(r),dvInd:ctx.addr||'',dvOra1:`${p2(d.getHours())}:${p2(d.getMinutes())}`,dvOra2:'',
          dvResp:ctx.user||'',dvOper:'',dvAltre:'',dvAb1:'',dvAb2:'',dvCambio:'',dvSosp:'',dvRef:ctx.ref||''},ctx};
     $('#dvDone').classList.remove('on');
   }
-  fill(); paint();
+  fill(); paint(); phPaint();
   $('#pDuvri').classList.add('open'); history.pushState({duvri:1},'');
   requestAnimationFrame(()=>{ const had=st.sig.slice(); sizeSig(); if(had.some(Boolean)){ /* ridimensionamento: firme da rifare */ } });
   $('#pDuvri .dv').scrollTop=0;
@@ -173,6 +226,7 @@ async function complete(){
     for(const k of [0,1]){ if(!st.sig[k]) continue; const t=trimCanvas($('#dvSig'+k)); if(!t) continue;
       const png=await doc.embedPng(t.toDataURL('image/png')); const [bx,by,bw,bh]=boxes[k]; const s=Math.min(bw/png.width,bh/png.height);
       pg.drawImage(png,{x:bx+(bw-png.width*s)/2,y:by,width:png.width*s,height:png.height*s}); }
+    await phPages(doc,L,clean(`Richiesta ${st.rs} - PV ${st.pv} - ${dataIt}`));
     doc.setTitle('DUVRI '+st.pv+' '+st.rs); doc.setProducer('PhotoSurvey');
     const out=await doc.save({useObjectStreams:false});
     st.pdf=new Blob([out],{type:'application/pdf'});
