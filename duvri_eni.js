@@ -20,7 +20,7 @@ const C3G=[
   ['Mettere in attoautorizzare eventuali operazioni nellarea lavori solo previa sospensione degli stessi e messa in',"Mettere in atto/autorizzare eventuali operazioni nell'area lavori solo previa sospensione degli stessi e messa in sicurezza dell'area da parte dell'impresa n.1"],
   ['Altro descrivere_2','Altro (descrivere)','AltroDescrizione2']];
 // riquadri firma (punti PDF, pagina 1): sulla riga "Firma" di ciascuna colonna Impresa n.1…n.4
-const SIGBOX=[[62,94,124,19],[206,94,98,19],[320,94,98,19],[434,94,90,19]];
+const SIGBOX=[[62,94,124,19],[206,94,98,19],[320,94,98,19],[434,94,90,19],[388,175,128,52]]; // ultimo: firma del Gestore PV (riquadro a destra di "Timbro e firma del Gestore")
 const css=`
 #pDuvriE .dv{padding:12px 14px 30px;overflow:auto;flex:1}
 #pDuvriE .blk{background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
@@ -95,11 +95,13 @@ function build(){
         <div><label class="f">del</label><input data-tx="del" data-date type="date"></div></div>
       <label class="f">Timbro e firma del Gestore del Punto Vendita</label><input data-tx="Timbro e firma del Gestore del Punto Vendita">
     </div>
-    <div class="blk"><h3>Timbri e firme delle imprese</h3>
+    <div class="blk"><h3>Timbri e firme</h3>
       <div class="note">Il timbro di ogni impresa va sulla riga "Timbro" del modulo; la firma si fa qui col dito.</div>
       ${[1,2,3,4].map(n=>`<div class="sigh"><span>Impresa n.${n}</span><button data-clr="${n-1}">Cancella firma</button></div>
         <input data-tx="${n===1?'Firma':'Firma_'+n}" placeholder="Timbro / nome impresa n.${n}" style="margin-bottom:6px">
         <canvas class="sig" id="deSig${n-1}"></canvas>`).join('')}
+      <div class="sigh"><span>Gestore del Punto Vendita</span><button data-clr="4">Cancella firma</button></div>
+      <canvas class="sig" id="deSig4"></canvas>
     </div>
     <button class="btn a" id="bDeOk" style="width:100%">✅ Completo</button>
     <div class="blk done" id="deDone" style="margin-top:12px"><h3>DUVRI pronto</h3><div id="deName" style="font-size:13px;margin-bottom:8px;word-break:break-all"></div>
@@ -116,7 +118,7 @@ function build(){
   });
   sec.addEventListener('input',e=>{ const t=e.target.closest('[data-tx]'); if(t) st.t[t.dataset.tx]=t.value; });
   $('#bDeSug').onclick=()=>{ const s=sunto(st.ctx.desc); st.t['Descrizione del lavoro 1']=s; fill(); if(!s) window.toast&&toast('La richiesta non ha una descrizione',2500); };
-  [0,1,2,3].forEach(initSig);
+  [0,1,2,3,4].forEach(initSig);
   $('#bDeOk').onclick=complete;
   $('#bDeDl').onclick=()=>{ if(!st.pdf) return; const a=document.createElement('a'); a.href=URL.createObjectURL(st.pdf); a.download=st.name; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},4000); };
   $('#bDeSh').onclick=async()=>{ if(!st.pdf) return; const f=new File([st.pdf],st.name,{type:'application/pdf'});
@@ -131,16 +133,16 @@ function initSig(k){
   cv.addEventListener('pointermove',e=>{ if(!drawing) return; const p=pos(e), g=cv.getContext('2d'); g.lineWidth=3.2; g.lineCap='round'; g.lineJoin='round'; g.strokeStyle='#0b2a5b'; g.beginPath(); g.moveTo(last[0],last[1]); g.lineTo(p[0],p[1]); g.stroke(); last=p; e.preventDefault(); });
   ['pointerup','pointercancel','pointerleave'].forEach(t=>cv.addEventListener(t,()=>{ drawing=false; }));
 }
-function sizeSig(){ [0,1,2,3].forEach(k=>{ const cv=$('#deSig'+k), r=cv.getBoundingClientRect(); const w=Math.round(r.width*2)||640; if(cv.width!==w){ cv.width=w; cv.height=Math.round(w*120/Math.max(1,r.width)); st.sig[k]=false; } }); }
+function sizeSig(){ [0,1,2,3,4].forEach(k=>{ const cv=$('#deSig'+k), r=cv.getBoundingClientRect(); const w=Math.round(r.width*2)||640; if(cv.width!==w){ cv.width=w; cv.height=Math.round(w*120/Math.max(1,r.width)); st.sig[k]=false; } }); }
 function clearSig(k){ const cv=$('#deSig'+k); cv.getContext('2d').clearRect(0,0,cv.width,cv.height); st.sig[k]=false; }
-function wipeSigs(){ [0,1,2,3].forEach(k=>{ const cv=$('#deSig'+k); if(cv) clearSig(k); }); }
+function wipeSigs(){ [0,1,2,3,4].forEach(k=>{ const cv=$('#deSig'+k); if(cv) clearSig(k); }); }
 window.openDuvriEni=function(r,ctx){
   build();
   const key=(ctx.pv||'')+'|'+(r.n||'');
   if(!st||st.key!==key){
     if(st) wipeSigs();
     const d=today();
-    st={key,rs:r.n||'',pv:ctx.pv,c:{},sig:[false,false,false,false],pdf:null,name:'',ctx:{...ctx,desc:r.desc||''},
+    st={key,rs:r.n||'',pv:ctx.pv,c:{},sig:[false,false,false,false,false],pdf:null,name:'',ctx:{...ctx,desc:r.desc||''},
       t:{'Richiesta':r.n||'','Data inizio lavoro':d,'Data prevista per la fine del lavoro':d,'Descrizione del lavoro 1':sunto(r.desc),
          'Ragione Sociale Impresa n1':'ARGELATO SRL','Nominativo del ResponsabilePreposto dellImpresa':ctx.user||'','Firma':ctx.user||'',
          'Timbro e firma del Gestore del Punto Vendita':[ctx.pv,ctx.addr].filter(Boolean).join(' - ')}};
@@ -175,6 +177,7 @@ async function complete(){
   const btn=$('#bDeOk');
   const nsig=st.sig.filter(Boolean).length, warn=[];
   if(!st.sig[0]) warn.push('manca la firma dell\'impresa n.1');
+  if(!st.sig[4]) warn.push('manca la firma del gestore');
   if(!C2.some(c=>st.c[c[0]])) warn.push('tipo di interferenza (Campo 2) non indicato');
   if(warn.length&&!confirm('Attenzione: '+warn.join(', ')+'.\nGenero comunque il PDF?')) return;
   btn.disabled=true; btn.textContent='⏳ Genero il PDF…';
@@ -204,7 +207,7 @@ async function complete(){
       for(const [,o] of ctx.enumerateIndirectObjects()){ if(o instanceof L.PDFArray) fixArr(o); else if(o instanceof L.PDFDict) fixDict(o); else if(o instanceof L.PDFStream) fixDict(o.dict); }
       pages.forEach(p=>{ const a=p.node.lookup(L.PDFName.of('Annots')); if(a instanceof L.PDFArray&&a.size()===0) p.node.delete(L.PDFName.of('Annots')); });
       const af=doc.catalog.lookup(L.PDFName.of('AcroForm')); if(af instanceof L.PDFDict){ af.set(L.PDFName.of('Fields'),ctx.obj([])); af.delete(L.PDFName.of('CO')); af.delete(L.PDFName.of('NeedAppearances')); } }
-    for(const k of [0,1,2,3]){ if(!st.sig[k]) continue; const t=trimCanvas($('#deSig'+k)); if(!t) continue;
+    for(const k of [0,1,2,3,4]){ if(!st.sig[k]) continue; const t=trimCanvas($('#deSig'+k)); if(!t) continue;
       const png=await doc.embedPng(t.toDataURL('image/png')); const [bx,by,bw,bh]=SIGBOX[k]; const s=Math.min(bw/png.width,bh/png.height);
       pages[0].drawImage(png,{x:bx+(bw-png.width*s)/2,y:by,width:png.width*s,height:png.height*s}); }
     doc.setTitle('DUVRI '+st.pv+' '+st.rs); doc.setProducer('PhotoSurvey');
