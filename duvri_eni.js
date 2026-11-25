@@ -20,7 +20,7 @@ const C3G=[
   ['Mettere in attoautorizzare eventuali operazioni nellarea lavori solo previa sospensione degli stessi e messa in',"Mettere in atto/autorizzare eventuali operazioni nell'area lavori solo previa sospensione degli stessi e messa in sicurezza dell'area da parte dell'impresa n.1"],
   ['Altro descrivere_2','Altro (descrivere)','AltroDescrizione2']];
 // riquadri firma (punti PDF, pagina 1): sulla riga "Firma" di ciascuna colonna Impresa n.1…n.4
-const SIGBOX=[[62,94,124,19],[206,94,98,19],[320,94,98,19],[434,94,90,19],[388,175,128,52]]; // ultimo: firma del Gestore PV (riquadro a destra di "Timbro e firma del Gestore")
+const SIGBOX=[[55,95,138,62],[202,95,106,62],[316,95,106,62],[430,95,97,62],[388,175,128,52]]; // Impresa n.1–4: tutta la cella sotto "Impresa n.x" // ultimo: firma del Gestore PV (riquadro a destra di "Timbro e firma del Gestore")
 const css=`
 #pDuvriE .dv{padding:12px 14px 30px;overflow:auto;flex:1}
 #pDuvriE .blk{background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
@@ -210,7 +210,7 @@ async function complete(){
       const af=doc.catalog.lookup(L.PDFName.of('AcroForm')); if(af instanceof L.PDFDict){ af.set(L.PDFName.of('Fields'),ctx.obj([])); af.delete(L.PDFName.of('CO')); af.delete(L.PDFName.of('NeedAppearances')); } }
     for(const k of [0,1,2,3,4]){ if(!st.sig[k]) continue; const t=trimCanvas($('#deSig'+k)); if(!t) continue;
       const png=await doc.embedPng(t.toDataURL('image/png')); const [bx,by,bw,bh]=SIGBOX[k]; const s=Math.min(bw/png.width,bh/png.height);
-      pages[0].drawImage(png,{x:bx+(bw-png.width*s)/2,y:by,width:png.width*s,height:png.height*s}); }
+      pages[0].drawImage(png,{x:bx+(bw-png.width*s)/2,y:by+(bh-png.height*s)/2,width:png.width*s,height:png.height*s}); }
     doc.setTitle('DUVRI '+st.pv+' '+st.rs); doc.setProducer('PhotoSurvey');
     const out=await doc.save({useObjectStreams:false});
     st.pdf=new Blob([out],{type:'application/pdf'});

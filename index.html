@@ -575,7 +575,7 @@ window.addEventListener('popstate',()=>{ if(window.duvriOpen&&duvriOpen()) close
 function loadScript(src){ return new Promise((ok,ko)=>{ const s=document.createElement('script'); s.src=src; s.onload=ok; s.onerror=()=>ko(new Error('non disponibile')); document.head.appendChild(s); }); }
 $('#bDuvri').onclick=async()=>{ if(!DREQ||!sel) return;
   const q8=DREQ.src==='Q8';
-  try{ if(q8&&!window.openDuvri) await loadScript('duvri.js?v=4'); if(!q8&&!window.openDuvriEni) await loadScript('duvri_eni.js?v=3'); }catch(e){ toast('Modulo DUVRI non disponibile: serve la rete',3000); return; }
+  try{ if(q8&&!window.openDuvri) await loadScript('duvri.js?v=4'); if(!q8&&!window.openDuvriEni) await loadScript('duvri_eni.js?v=4'); }catch(e){ toast('Modulo DUVRI non disponibile: serve la rete',3000); return; }
   const c=CONTACTS&&CONTACTS[sel.id];
   (q8?openDuvri:openDuvriEni)(DREQ,{pv:sel.id, addr:sel.a.replace(/^\d+\s/,''), user:user(), code:userCode(user()), ref:(c&&c[0])||'',
     archive:async(blob,name)=>{ await qAdd({siteId:sel.id,name:user(),photos:[{name,b64:await b64(blob)}],ts:Date.now()}); updPending(); processQueue(); }});
