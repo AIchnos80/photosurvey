@@ -2,7 +2,7 @@
 // compilazione sul telefono, 4 firme col dito e PDF dal modello originale (pdf-lib). Il PDF e le firme restano solo in memoria.
 (function(){
 const PDFLIB='https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js';
-const TEMPLATE='DUVRI_Enilive.pdf';
+const TEMPLATES=['DUVRI_Enilive.pdf','DUVRI%20Enilive.pdf']; // il modello può essere caricato con o senza trattino basso
 // caselle del modello (nome del campo PDF → testo sullo schermo)
 const C2=[
   ['Nessuna interferenza significativa non occorre compilare i rimanenti campi','a) Nessuna interferenza significativa, non occorre compilare i rimanenti campi'],
@@ -183,7 +183,8 @@ async function complete(){
   btn.disabled=true; btn.textContent='⏳ Genero il PDF…';
   try{
     await loadLib(); const L=window.PDFLib;
-    const bytes=await fetch(TEMPLATE,{cache:'no-cache'}).then(r=>{ if(!r.ok) throw new Error('Modello DUVRI ENILIVE non trovato'); return r.arrayBuffer(); });
+    let bytes=null; for(const u of TEMPLATES){ try{ const r=await fetch(u,{cache:'no-cache'}); if(r.ok){ bytes=await r.arrayBuffer(); break; } }catch(e){} }
+    if(!bytes) throw new Error('Modello DUVRI ENILIVE non trovato');
     const doc=await L.PDFDocument.load(bytes); const form=doc.getForm(); const pages=doc.getPages(), refOf=w=>doc.context.getObjectRef(w.dict);
     const font=await doc.embedFont(L.StandardFonts.Helvetica);
     // pulsanti del modulo (es. Stampa): tolti dal PDF finale
