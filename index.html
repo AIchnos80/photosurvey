@@ -27,7 +27,11 @@
   .search input{width:100%;padding:12px 16px;border-radius:24px;border:1px solid #d0d5dd;font-size:16px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.12)}
   .results{background:#fff;border-radius:14px;margin-top:6px;box-shadow:0 4px 16px rgba(0,0,0,.15);overflow:hidden}
   .results button{display:block;width:100%;text-align:left;border:0;background:#fff;padding:12px 16px;border-bottom:1px solid #eef0f3;font-size:14px}
-  .chips{display:flex;gap:6px;margin-top:8px}
+  .chips{display:flex;gap:6px;margin-top:8px;align-items:center}
+  .chip{white-space:nowrap;flex:none} #chMan{flex:1;min-width:0;gap:5px;overflow-x:auto;scrollbar-width:none;padding:2px 2px 4px;margin:-2px 0 -4px} #chMan::-webkit-scrollbar{display:none} #chMan .chip{padding:5px 7px;font-size:12px} .msw.on .mt{display:none} .msw.on{padding-left:8px} .chip .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:-1px;border:1px solid #fff}
+  .chip:not(.on) .dot{opacity:.45}
+  .msw{margin-left:auto;background:var(--navy);color:#fff;border-radius:999px;padding:3px 4px 3px 10px;box-shadow:0 1px 4px rgba(0,0,0,.25);gap:6px}
+  .sw.msw .swl{min-width:0;font-size:12px;font-weight:600}
   .chip{border:1px solid #d0d5dd;background:#fff;border-radius:999px;padding:5px 12px;font-size:13px;box-shadow:0 1px 4px rgba(0,0,0,.1)}
   .chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}
   .fab{position:fixed;z-index:999;right:14px;bottom:calc(var(--sb) + 22px);width:56px;height:56px;border-radius:50%;border:0;background:var(--amber);color:var(--navy);box-shadow:0 4px 12px rgba(0,0,0,.25);font-size:24px}
@@ -140,8 +144,10 @@
   <input id="q" type="search" placeholder="Cerca SiteId o comune" autocomplete="off" enterkeyhint="search">
   <div class="results" id="res"></div>
   <div class="chips">
-    <button class="chip on" data-c="Q8">Q8</button>
-    <button class="chip on" data-c="ENILIVE">ENILIVE</button>
+    <span id="chCo" style="display:contents"><button class="chip on" data-c="Q8">Q8</button>
+    <button class="chip on" data-c="ENILIVE">ENILIVE</button></span>
+    <span id="chMan" style="display:none"></span>
+    <label class="sw msw" id="mSw" title="OFF = colori per compagnia · ON = colori per manutentore"><span class="swl">🛠<span class="mt"> MAN</span></span><input type="checkbox" id="mOn"><span class="track"></span></label>
   </div>
 </div>
 
@@ -250,10 +256,30 @@ $('#btnUser').onclick=openUser;
 const map = L.map('map',{zoomControl:false,attributionControl:true}).setView([39.75,9.0],8);
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
 
-function pinIcon(p, on){ return L.divIcon({className:'',html:`<div class="pin ${p.c==='Q8'?'q8':'eni'} ${on?'sel':''}">${p.id}</div>`,iconSize:[0,0]}); }
+/* ---------- colori per manutentore (switch 🛠 MAN: parte su OFF) ---------- */
+const MANS=[['NS','#2E7D32'],['MC','#7B1FA2'],['JF','#C62828'],['SP','#00838F'],['Elettra','#EF6C00']], MAN_ND=['N/D','#8A94A6'];
+let byMan=false, filtM=new Set([...MANS.map(m=>m[0]),MAN_ND[0]]);
+const manKey=p=>{ const c=CONTACTS&&CONTACTS[p.id]; const v=String(c&&c[2]||'').trim().toUpperCase(); const m=MANS.find(x=>x[0].toUpperCase()===v); return m?m[0]:MAN_ND[0]; };
+const manCol=k=>(MANS.find(x=>x[0]===k)||MAN_ND)[1];
+const isVis=p=>byMan?filtM.has(manKey(p)):filt.has(p.c);
+function pinIcon(p, on){ const st=byMan&&!on?` style="background:${manCol(manKey(p))};color:#fff"`:''; return L.divIcon({className:'',html:`<div class="pin ${p.c==='Q8'?'q8':'eni'} ${on?'sel':''}"${st}>${p.id}</div>`,iconSize:[0,0]}); }
+function renderManChips(){
+  const used=new Set(PV.map(manKey)); const list=[...MANS, ...(used.has(MAN_ND[0])?[MAN_ND]:[])];
+  $('#chMan').innerHTML=list.map(([k,c])=>`<button class="chip ${filtM.has(k)?'on':''}" data-m="${k}"><span class="dot" style="background:${c}"></span>${k}</button>`).join('');
+  $('#chMan').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{ const k=b.dataset.m; filtM.has(k)?filtM.delete(k):filtM.add(k); b.classList.toggle('on'); drawMarkers(); });
+}
+function setByMan(on){
+  byMan=on; $('#mOn').checked=on; $('#mSw').classList.toggle('on',on); $('#chCo').style.display=on?'none':'contents'; $('#chMan').style.display=on?'flex':'none';
+  if(on) renderManChips();
+  for(const p of PV) if(markers[p.id]) markers[p.id].setIcon(pinIcon(p, sel&&sel.id===p.id));
+  drawMarkers();
+}
+$('#mOn').onchange=()=>{ const on=$('#mOn').checked;
+  if(on&&!CONTACTS){ $('#mOn').checked=false; toast('🔒 Il manutentore è nei contatti protetti: serve la password',2500); openUnlock(); return; }
+  setByMan(on); };
 function drawMarkers(){
   for(const p of PV){
-    const vis = filt.has(p.c);
+    const vis = isVis(p);
     if(!markers[p.id]){ markers[p.id]=L.marker([p.lat,p.lon],{icon:pinIcon(p,false)}).on('click',()=>select(p)); }
     const m=markers[p.id];
     if(vis && !map.hasLayer(m)) m.addTo(map); if(!vis && map.hasLayer(m)) map.removeLayer(m);
@@ -298,7 +324,7 @@ function locate(cb){
   },e=>toast(e.code===1?'Permesso posizione negato: abilitalo nelle impostazioni del browser':'Posizione non disponibile'),{enableHighAccuracy:true,timeout:15000,maximumAge:60000});
 }
 $('#near').onclick=()=>locate(()=>{
-  const c=PV.filter(p=>filt.has(p.c)); if(!c.length) return;
+  const c=PV.filter(isVis); if(!c.length) return;
   let best=c[0],bd=1e9; for(const p of c){ const d=dist(me[0],me[1],p.lat,p.lon); if(d<bd){bd=d;best=p;} }
   select(best);
 });
