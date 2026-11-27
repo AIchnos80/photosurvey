@@ -154,8 +154,9 @@ function build(){
       <div class="sigh"><span>Gestore del Punto Vendita</span><button data-clr="4">Cancella firma</button></div>
       <canvas class="sig" id="deSig4"></canvas>
     </div>
+    ${window.DuvriOTP?DuvriOTP.block('de'):''}
     <button class="btn a" id="bDeOk" style="width:100%">✅ Completo</button>
-    <div class="blk done" id="deDone" style="margin-top:12px"><h3>DUVRI pronto</h3><div id="deName" style="font-size:13px;margin-bottom:8px;word-break:break-all"></div>
+    <div class="blk done" id="deDone" style="margin-top:12px"><h3>DUVRI pronto</h3><div id="deName" style="font-size:13px;margin-bottom:8px;word-break:break-all"></div><div id="deOtp"></div>
       <div style="display:flex;gap:8px"><button class="btn s" id="bDeDl" style="flex:1">⬇ Scarica</button><button class="btn s" id="bDeSh" style="flex:1">📤 Invia (WhatsApp…)</button></div>
       <div id="deArch" style="font-size:12px;color:#667;margin-top:8px"></div></div>
   </div>`;
@@ -199,7 +200,8 @@ window.openDuvriEni=function(r,ctx){
       t:{'Richiesta':r.n||'','Data inizio lavoro':d,'Data prevista per la fine del lavoro':d,'Descrizione del lavoro 1':sunto(r.desc),
          'Ragione Sociale Impresa n1':'ARGELATO SRL','Nominativo del ResponsabilePreposto dellImpresa':ctx.user||'','Firma':ctx.user||'',
          'Timbro e firma del Gestore del Punto Vendita':[ctx.pv,ctx.addr].filter(Boolean).join(' - ')}};
-    $('#deDone').classList.remove('on');
+    $('#deDone').classList.remove('on'); $('#deOtp').innerHTML='';
+    window.DuvriOTP&&DuvriOTP.init('de',ctx);
   }
   st.ctx={...st.ctx,...ctx,desc:r.desc||''};
   fill(); paint(); phPaint();
@@ -233,8 +235,10 @@ async function complete(){
   if(!st.sig[4]) warn.push('manca la firma del gestore');
   if(!C2.some(c=>st.c[c[0]])) warn.push('tipo di interferenza (Campo 2) non indicato');
   if(warn.length&&!confirm('Attenzione: '+warn.join(', ')+'.\nGenero comunque il PDF?')) return;
+  const oo=window.DuvriOTP?DuvriOTP.opts('de'):{on:false}; let od=null;
   btn.disabled=true; btn.textContent='⏳ Genero il PDF…';
   try{
+    if(oo.on){ od=await DuvriOTP.prepare(oo,{rs:st.rs,pv:st.pv,addr:st.ctx.addr,user:st.ctx.user}); if(!od) return; }
     await loadLib(); const L=window.PDFLib;
     let bytes=null; for(const u of TEMPLATES){ try{ const r=await fetch(u,{cache:'no-cache'}); if(r.ok){ bytes=await r.arrayBuffer(); break; } }catch(e){} }
     if(!bytes) throw new Error('Modello DUVRI ENILIVE non trovato');
@@ -265,11 +269,13 @@ async function complete(){
       const png=await doc.embedPng(t.toDataURL('image/png')); const [bx,by,bw,bh]=SIGBOX[k]; const s=Math.min(bw/png.width,bh/png.height);
       pages[0].drawImage(png,{x:bx+(bw-png.width*s)/2,y:by+(bh-png.height*s)/2,width:png.width*s,height:png.height*s}); }
     await phPages(doc,L,clean(`Richiesta ${st.rs} - PV ${st.pv} - ${dIt(st.t['Data inizio lavoro'])}`));
+    if(od) await DuvriOTP.page(doc,L,od);
     doc.setTitle('DUVRI '+st.pv+' '+st.rs); doc.setProducer('PhotoSurvey');
     const out=await doc.save({useObjectStreams:false});
     st.pdf=new Blob([out],{type:'application/pdf'});
     st.name=`${String(st.rs||'').replace(/[\\/:*?"<>|#%]/g,'').trim()} ${st.pv} DUVRI.pdf`;
-    $('#deName').textContent=st.name; $('#deDone').classList.add('on'); $('#deDone').scrollIntoView({behavior:'smooth'});
+    $('#deName').textContent=st.name; $('#deOtp').innerHTML=''; $('#deArch').textContent=''; $('#deDone').classList.add('on'); $('#deDone').scrollIntoView({behavior:'smooth'});
+    if(od){ btn.textContent='⏳ In attesa della conferma del gestore…'; if(!await DuvriOTP.confirm($('#deOtp'),od,out)) return; }
     if(st.ctx.archive){ $('#deArch').textContent='⏳ Invio all\'archivio del PV in corso…'; try{ await st.ctx.archive(st.pdf,st.name); $('#deArch').textContent='📁 Inviato all\'archivio del PV, cartella DUVRI (o in coda se manca la rete).'; }catch(e){ $('#deArch').textContent='⚠️ Archiviazione non riuscita: '+e.message; } }
   }catch(e){ alert('Errore nella generazione del PDF: '+e.message); }
   finally{ btn.disabled=false; btn.textContent='✅ Completo'; }

@@ -114,8 +114,9 @@ function build(){
       <div class="sigh"><span>Firma del responsabile dell'attività</span><button data-clr="0">Cancella</button></div><canvas class="sig" id="dvSig0"></canvas>
       <div class="sigh"><span>Firma del Referente / gestore</span><button data-clr="1">Cancella</button></div><canvas class="sig" id="dvSig1"></canvas>
     </div>
+    ${window.DuvriOTP?DuvriOTP.block('dv'):''}
     <button class="btn a" id="bDvOk" style="width:100%">✅ Completo</button>
-    <div class="blk done" id="dvDone" style="margin-top:12px"><h3>DUVRI pronto</h3><div id="dvName" style="font-size:13px;margin-bottom:8px;word-break:break-all"></div>
+    <div class="blk done" id="dvDone" style="margin-top:12px"><h3>DUVRI pronto</h3><div id="dvName" style="font-size:13px;margin-bottom:8px;word-break:break-all"></div><div id="dvOtp"></div>
       <div class="row2" style="display:flex;gap:8px"><button class="btn s" id="bDvDl" style="flex:1">⬇ Scarica</button><button class="btn s" id="bDvSh" style="flex:1">📤 Invia (WhatsApp…)</button></div>
       <div id="dvArch" style="font-size:12px;color:#667;margin-top:8px"></div></div>
   </div>`;
@@ -162,7 +163,8 @@ window.openDuvri=function(r,ctx){
     st={key,rs:r.n||'',pv:ctx.pv,r:{},sig:[false,false],ph:[],pdf:null,name:'',
       f:{dvData:`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`,dvInt:tipoToInt(r),dvInd:ctx.addr||'',dvOra1:`${p2(d.getHours())}:${p2(d.getMinutes())}`,dvOra2:'',
          dvResp:ctx.user||'',dvOper:'',dvAltre:'',dvAb1:'',dvAb2:'',dvCambio:'',dvSosp:'',dvRef:ctx.ref||''},ctx};
-    $('#dvDone').classList.remove('on');
+    $('#dvDone').classList.remove('on'); $('#dvOtp').innerHTML='';
+    window.DuvriOTP&&DuvriOTP.init('dv',ctx);
   }
   fill(); paint(); phPaint();
   $('#pDuvri').classList.add('open'); history.pushState({duvri:1},'');
@@ -185,8 +187,10 @@ async function complete(){
   const miss=SPEC.flatMap(p=>p.items.filter(i=>i.f&&!st.r[i.f]).map(i=>p.id)).length;
   const warn=[]; if(miss) warn.push(miss+' domande senza risposta'); if(!st.sig[0]) warn.push('manca la firma del responsabile'); if(!st.sig[1]) warn.push('manca la firma del referente');
   if(warn.length&&!confirm('Attenzione: '+warn.join(', ')+'.\nGenero comunque il PDF?')) return;
+  const oo=window.DuvriOTP?DuvriOTP.opts('dv'):{on:false}; let od=null;
   btn.disabled=true; btn.textContent='⏳ Genero il PDF…';
   try{
+    if(oo.on){ if(!oo.name.trim()) oo.name=st.f.dvRef||''; od=await DuvriOTP.prepare(oo,{rs:st.rs,pv:st.pv,addr:st.f.dvInd,user:st.ctx.user}); if(!od) return; }
     await loadLib(); const L=window.PDFLib;
     const bytes=await fetch(TEMPLATE,{cache:'no-cache'}).then(r=>{ if(!r.ok) throw new Error('Modello DUVRI non trovato'); return r.arrayBuffer(); });
     const doc=await L.PDFDocument.load(bytes); const form=doc.getForm();
@@ -227,11 +231,13 @@ async function complete(){
       const png=await doc.embedPng(t.toDataURL('image/png')); const [bx,by,bw,bh]=boxes[k]; const s=Math.min(bw/png.width,bh/png.height);
       pg.drawImage(png,{x:bx+(bw-png.width*s)/2,y:by+(bh-png.height*s)/2,width:png.width*s,height:png.height*s}); }
     await phPages(doc,L,clean(`Richiesta ${st.rs} - PV ${st.pv} - ${dataIt}`));
+    if(od) await DuvriOTP.page(doc,L,od);
     doc.setTitle('DUVRI '+st.pv+' '+st.rs); doc.setProducer('PhotoSurvey');
     const out=await doc.save({useObjectStreams:false});
     st.pdf=new Blob([out],{type:'application/pdf'});
     st.name=`${String(st.rs||'').replace(/[\\/:*?"<>|#%]/g,'').trim()} ${st.pv} DUVRI.pdf`;
-    $('#dvName').textContent=st.name; $('#dvDone').classList.add('on'); $('#dvDone').scrollIntoView({behavior:'smooth'});
+    $('#dvName').textContent=st.name; $('#dvOtp').innerHTML=''; $('#dvArch').textContent=''; $('#dvDone').classList.add('on'); $('#dvDone').scrollIntoView({behavior:'smooth'});
+    if(od){ btn.textContent='⏳ In attesa della conferma del gestore…'; if(!await DuvriOTP.confirm($('#dvOtp'),od,out)) return; }
     if(st.ctx.archive){ $('#dvArch').textContent='⏳ Invio all\'archivio del PV in corso…'; try{ await st.ctx.archive(st.pdf,st.name); $('#dvArch').textContent='📁 Inviato all\'archivio del PV (o in coda se manca la rete).'; }catch(e){ $('#dvArch').textContent='⚠️ Archiviazione non riuscita: '+e.message; } }
   }catch(e){ alert('Errore nella generazione del PDF: '+e.message); }
   finally{ btn.disabled=false; btn.textContent='✅ Completo'; }
